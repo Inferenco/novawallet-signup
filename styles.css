@@ -36,12 +36,15 @@ body {
 .page {
   min-height: 100vh;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   padding: 56px 20px 72px;
   position: relative;
   overflow: hidden;
+  gap: 48px;
 }
+
 
 .page::before,
 .page::after {
@@ -250,10 +253,12 @@ body {
 }
 
 @keyframes pulse {
+
   0%,
   100% {
     transform: scale(1);
   }
+
   50% {
     transform: scale(1.04);
   }
@@ -279,4 +284,36 @@ body {
     min-width: 92px;
     min-height: 92px;
   }
+}
+
+.social-links {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+}
+
+.social-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--ink-2);
+  transition: all 0.2s ease;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.social-icon:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--ink-0);
+  border-color: var(--ink-1);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.social-icon svg {
+  width: 20px;
+  height: 20px;
 }
