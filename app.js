@@ -49,6 +49,20 @@ function Footer() {
           })
         )
       )
+    ),
+    e(
+      "div",
+      { style: { display: "flex", justifyContent: "center", marginTop: "24px", fontSize: "0.85rem" } },
+      e(
+        "a",
+        {
+          href: "/privacy.html",
+          style: { color: "var(--ink-2)", textDecoration: "none", transition: "color 0.2s ease" },
+          onMouseOver: (e) => (e.target.style.color = "var(--ink-0)"),
+          onMouseOut: (e) => (e.target.style.color = "var(--ink-2)"),
+        },
+        "Privacy Policy"
+      )
     )
   );
 }
