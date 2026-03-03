@@ -1,0 +1,25 @@
+:root {
+  color-scheme: dark;
+  --bg-0: #040913;
+  --bg-1: #0a1526;
+  --bg-2: #10213a;
+  --ink-0: #e8f2ff;
+  --ink-1: #b7d1eb;
+  --ink-2: #84a4c4;
+  --a-0: #36e8ff;
+  --a-1: #1c8cff;
+  --a-2: #0e55dd;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg-0: #f3f8ff;
+  --bg-1: #e2edff;
+  --bg-2: #cedffd;
+  --ink-0: #09172f;
+  --ink-1: #1d3252;
+  --ink-2: #3f5678;
+  --a-0: #006ac3;
+  --a-1: #0056ab;
+  --a-2: #01458a;
+}
