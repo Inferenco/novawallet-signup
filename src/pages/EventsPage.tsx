@@ -20,6 +20,7 @@ import { useWallet } from "@/providers/WalletProvider";
 import { useToast } from "@/providers/ToastProvider";
 import { hasConfiguredWalletContract } from "@/config/env";
 import { GlassCard, NovaButton } from "@/components/ui";
+import { EscrowInfoPanel } from "@/components/events/EscrowInfoPanel";
 
 const PAGE_SIZE = 10;
 
@@ -206,6 +207,8 @@ export function EventsPage() {
         )}
       </GlassCard>
       </section>
+
+      <EscrowInfoPanel fees={feesQuery.data} isLoading={feesQuery.isLoading} />
 
       <EventFilters
         categories={categoriesQuery.data ?? ["All"]}
