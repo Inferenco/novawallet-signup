@@ -6,7 +6,7 @@ import {
 } from "@/components/events/EventForm";
 import { EventList } from "@/components/events/EventList";
 import {
-  useCategoryOptions,
+  useAllCategoriesQuery,
   useEventFeesQuery,
   usePublicEventsQuery,
 } from "@/hooks/events/useEventQueries";
@@ -38,7 +38,7 @@ export function EventsPage() {
     pageSize: PAGE_SIZE,
     category,
   });
-  const categoryOptions = useCategoryOptions(eventsQuery.data);
+  const categoriesQuery = useAllCategoriesQuery();
   const { submitEventMutation } = useEventMutations();
 
   const escrowAmount = feesQuery.data?.minEscrowFee;
@@ -208,7 +208,7 @@ export function EventsPage() {
       </section>
 
       <EventFilters
-        categories={categoryOptions}
+        categories={categoriesQuery.data ?? ["All"]}
         selectedCategory={category}
         onCategoryChange={(next) => {
           setCategory(next);

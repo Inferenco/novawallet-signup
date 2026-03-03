@@ -26,7 +26,11 @@ export function EventFilters({
         onChange={(event) => onCategoryChange(event.target.value)}
       >
         {categories.map((category) => (
-          <option key={category} value={category}>
+          <option
+            key={category}
+            value={category}
+            style={{ backgroundColor: "#14141e", color: "#ffffff" }}
+          >
             {category}
           </option>
         ))}

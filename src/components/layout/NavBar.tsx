@@ -72,7 +72,7 @@ export function NavBar({ theme, onToggleTheme, hideThemeToggle }: NavBarProps) {
           {!hideThemeToggle && (
             <button
               onClick={onToggleTheme}
-              className="whitespace-nowrap rounded-nova-round bg-surface-glass px-nova-md py-nova-sm text-body text-text-secondary transition-colors hover:bg-surface-glass/80 hover:text-text-primary"
+              className="hidden whitespace-nowrap rounded-nova-round bg-surface-glass px-nova-md py-nova-sm text-body text-text-secondary transition-colors hover:bg-surface-glass/80 hover:text-text-primary md:block"
               type="button"
               aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
             >
@@ -130,7 +130,7 @@ export function NavBar({ theme, onToggleTheme, hideThemeToggle }: NavBarProps) {
                     onToggleTheme();
                     closeMobileMenu();
                   }}
-                  className="rounded-nova-small px-nova-md py-nova-md text-left text-body text-text-secondary transition-colors hover:bg-surface-glass/50 hover:text-text-primary sm:hidden"
+                  className="rounded-nova-small px-nova-md py-nova-md text-left text-body text-text-secondary transition-colors hover:bg-surface-glass/50 hover:text-text-primary"
                   type="button"
                 >
                   {theme === "dark" ? "Switch to Light" : "Switch to Dark"}

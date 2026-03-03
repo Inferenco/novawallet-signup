@@ -84,6 +84,18 @@ export function useUserPendingEventsQuery({
   });
 }
 
+export function useAllCategoriesQuery() {
+  return useQuery({
+    queryKey: eventsQueryKeys.categories(),
+    queryFn: async () => {
+      const rows = await fetchEventsPage({ limit: 100, offset: 0 });
+      const unique = new Set(rows.map((event) => event.category).filter(Boolean));
+      return ["All", ...Array.from(unique).sort()];
+    },
+    staleTime: 60000
+  });
+}
+
 export function useCategoryOptions(
   categoriesSource: Array<{ category: string }> | undefined
 ): string[] {
