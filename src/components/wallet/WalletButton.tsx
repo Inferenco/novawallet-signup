@@ -32,18 +32,21 @@ export function WalletButton() {
     }
   }, [open]);
 
+  const navLinkClass =
+    "whitespace-nowrap rounded-nova-round bg-surface-glass px-nova-md py-nova-sm text-body text-text-secondary transition-colors hover:bg-surface-glass/80 hover:text-text-primary";
+
   if (connected && account) {
     return (
       <div className="relative" ref={dropdownRef}>
         <button
           type="button"
-          className="nova-btn nova-btn-accent nova-btn-sm"
+          className={`${navLinkClass} bg-surface-glass font-medium text-text-primary`}
           onClick={() => setOpen((current) => !current)}
         >
           {shortAddress(account.address.toString())}
         </button>
         {open && (
-          <div className="nova-card absolute right-0 top-12 w-48 p-nova-sm shadow-xl">
+          <div className="absolute right-0 top-12 w-48 rounded-nova-standard border border-surface-glass-border bg-bg-secondary p-nova-sm shadow-xl">
             <button
               type="button"
               className="flex w-full items-center gap-nova-sm rounded-nova-small px-nova-md py-nova-sm text-left text-body-small text-text-secondary transition-colors hover:bg-surface-glass hover:text-text-primary"
@@ -76,9 +79,9 @@ export function WalletButton() {
         href={walletInstallUrl}
         target="_blank"
         rel="noreferrer"
-        className="nova-btn nova-btn-ghost nova-btn-sm"
+        className={navLinkClass}
       >
-        Install Zedra
+        Install Wallet
       </a>
     );
   }
@@ -87,21 +90,21 @@ export function WalletButton() {
     <div className="relative" ref={dropdownRef}>
       <button
         type="button"
-        className="nova-btn nova-btn-ghost nova-btn-sm"
+        className={`${navLinkClass} ${connecting ? "opacity-50" : ""}`}
         onClick={() => setOpen((current) => !current)}
         disabled={connecting}
       >
         {connecting ? (
-          <>
+          <span className="flex items-center gap-2">
             <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
-            Connecting...
-          </>
+            Connecting
+          </span>
         ) : (
-          "Connect Wallet"
+          "Connect"
         )}
       </button>
       {open && (
-        <div className="nova-card absolute right-0 top-12 w-52 p-nova-sm shadow-xl">
+        <div className="absolute right-0 top-12 w-52 rounded-nova-standard border border-surface-glass-border bg-bg-secondary p-nova-sm shadow-xl">
           {wallets.map((wallet) => (
             <button
               key={wallet.name}
