@@ -1,6 +1,7 @@
 import { DateTime } from "luxon";
 
 export type EventStatus = "Live" | "Upcoming" | "Past" | "TBA";
+export const OCTAS_PER_CEDRA = 100_000_000n;
 
 export function toU64String(value: string | number | bigint): string {
   if (typeof value === "bigint") return value.toString();
@@ -30,6 +31,22 @@ export function shortAddress(address: string | undefined): string {
   if (!address) return "";
   if (address.length < 14) return address;
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
+}
+
+export function formatCedraFromOctas(octas: bigint): string {
+  const whole = octas / OCTAS_PER_CEDRA;
+  const fractional = octas % OCTAS_PER_CEDRA;
+
+  if (fractional === 0n) {
+    return `${whole.toString()} CEDRA`;
+  }
+
+  const fractionText = fractional
+    .toString()
+    .padStart(8, "0")
+    .replace(/0+$/, "");
+
+  return `${whole.toString()}.${fractionText} CEDRA`;
 }
 
 export function toUnixSeconds(dateTimeLocal: string): number {

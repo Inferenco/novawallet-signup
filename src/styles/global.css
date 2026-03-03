@@ -31,3 +31,88 @@ code {
   padding: 0.08rem 0.32rem;
   font-size: 0.85em;
 }
+
+@keyframes nova-cta-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 0 rgb(54 232 255 / 40%),
+      0 0 28px rgb(29 156 255 / 35%);
+  }
+  50% {
+    box-shadow:
+      0 0 0 10px rgb(54 232 255 / 0%),
+      0 0 50px rgb(29 156 255 / 55%);
+  }
+}
+
+@keyframes nova-cta-shimmer {
+  from {
+    transform: translateX(-140%) skewX(-20deg);
+  }
+  to {
+    transform: translateX(180%) skewX(-20deg);
+  }
+}
+
+@keyframes nova-arrow-bounce {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(4px);
+  }
+}
+
+.nova-submit-cta {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  overflow: hidden;
+  border: 1px solid rgb(126 240 255 / 65%);
+  border-radius: 9999px;
+  padding: 0.85rem 1.45rem;
+  color: var(--ink-0);
+  font-size: 0.92rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  background: linear-gradient(125deg, rgb(6 78 132 / 95%), rgb(1 147 214 / 80%), rgb(14 91 255 / 90%));
+  animation: nova-cta-pulse 2.4s ease-in-out infinite;
+  transition: transform 0.25s ease, filter 0.25s ease;
+}
+
+.nova-submit-cta::before {
+  content: "";
+  position: absolute;
+  inset: -22% auto -22% -40%;
+  width: 35%;
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 50%), transparent);
+  animation: nova-cta-shimmer 2.2s linear infinite;
+}
+
+.nova-submit-cta .cta-arrow {
+  animation: nova-arrow-bounce 1s ease-in-out infinite;
+}
+
+.nova-submit-cta:hover:not(:disabled) {
+  filter: brightness(1.08);
+  transform: translateY(-1px) scale(1.01);
+}
+
+.nova-submit-cta:disabled {
+  opacity: 0.45;
+  animation: none;
+  cursor: not-allowed;
+}
+
+.nova-cta-glow {
+  position: absolute;
+  inset: -80px -40px auto auto;
+  width: 300px;
+  height: 300px;
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgb(54 232 255 / 30%), transparent 70%);
+  pointer-events: none;
+}

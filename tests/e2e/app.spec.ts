@@ -2,13 +2,17 @@ import { expect, test } from "@playwright/test";
 
 test("connect wallet and submit event flow", async ({ page }) => {
   await page.goto("/");
+  await page.evaluate(() => {
+    localStorage.removeItem("nova_mock_network_mismatch");
+  });
+  await page.reload();
   await expect(page.getByRole("heading", { name: "Events" })).toBeVisible();
 
   await page.goto("/events");
   await page.getByRole("button", { name: "Connect Wallet" }).click();
   await page.getByRole("button", { name: "Mock Zedra" }).click();
 
-  await page.getByRole("button", { name: "Open form" }).click();
+  await page.getByRole("button", { name: "Start Event Submission" }).click();
 
   await page.getByLabel("Title").fill("E2E Event");
   await page
@@ -47,7 +51,7 @@ test("network mismatch blocks write actions", async ({ page }) => {
   await expect(
     page.getByText("Wallet network mismatch. Switch to Cedra Testnet")
   ).toBeVisible();
-  await expect(page.getByRole("button", { name: "Open form" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Start Event Submission" })).toBeDisabled();
 
   await page.evaluate(() => {
     localStorage.removeItem("nova_mock_network_mismatch");

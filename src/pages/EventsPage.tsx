@@ -1,10 +1,10 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { EventFilters } from "@/components/events/EventFilters";
 import { EventForm, type EventFormValues } from "@/components/events/EventForm";
 import { EventList } from "@/components/events/EventList";
 import { useCategoryOptions, useEventFeesQuery, usePublicEventsQuery } from "@/hooks/events/useEventQueries";
 import { useEventMutations } from "@/hooks/events/useEventMutations";
-import { toUnixSeconds, mapErrorMessage } from "@/lib/format";
+import { formatCedraFromOctas, mapErrorMessage, toUnixSeconds } from "@/lib/format";
 import { useWallet } from "@/providers/WalletProvider";
 import { useToast } from "@/providers/ToastProvider";
 import { hasConfiguredWalletContract } from "@/config/env";
@@ -16,6 +16,7 @@ export function EventsPage() {
   const [category, setCategory] = useState("All");
   const [showForm, setShowForm] = useState(false);
   const [lastTxHash, setLastTxHash] = useState<string | null>(null);
+  const formSectionRef = useRef<HTMLElement | null>(null);
 
   const wallet = useWallet();
   const { pushToast } = useToast();
@@ -31,6 +32,14 @@ export function EventsPage() {
     () => (eventsQuery.data?.length ?? 0) === PAGE_SIZE,
     [eventsQuery.data]
   );
+
+  const openSubmitForm = () => {
+    setShowForm(true);
+
+    window.requestAnimationFrame(() => {
+      formSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  };
 
   const handleSubmit = async (values: EventFormValues) => {
     if (!escrowAmount) {
@@ -73,7 +82,52 @@ export function EventsPage() {
         </p>
       ) : null}
 
-      <section className="grid gap-3 rounded-2xl border border-white/10 bg-white/5 p-4">
+      <section className="relative overflow-hidden rounded-3xl border border-accent-0/30 bg-gradient-to-br from-accent-1/35 via-bg-1/85 to-bg-0 p-5 shadow-[0_0_60px_rgba(29,156,255,0.25)]">
+        <div className="nova-cta-glow" aria-hidden />
+        <div className="relative z-10 grid gap-4 lg:grid-cols-[1.2fr_auto] lg:items-center">
+          <div className="space-y-2">
+            <p className="w-fit rounded-full border border-accent-0/50 bg-bg-0/40 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-accent-0">
+              Spotlight Your Event
+            </p>
+            <h2 className="font-display text-2xl text-ink-0 md:text-3xl">
+              Ready to publish your next event?
+            </h2>
+            <p className="max-w-2xl text-sm text-ink-1">
+              Open the submission flow, fill out details, and send your on-chain request in
+              under a minute.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            className="nova-submit-cta"
+            onClick={openSubmitForm}
+            disabled={writeDisabled}
+          >
+            <span>Start Event Submission</span>
+            <span aria-hidden className="cta-arrow">
+              →
+            </span>
+          </button>
+        </div>
+
+        {!wallet.connected ? (
+          <p className="relative z-10 mt-3 text-xs text-ink-1/90">
+            Connect your wallet first, then use the button above to jump into the form.
+          </p>
+        ) : null}
+
+        {wallet.networkMismatch ? (
+          <p className="relative z-10 mt-2 text-xs text-amber-100">
+            Your wallet is on the wrong network. Switch to Cedra Testnet to submit.
+          </p>
+        ) : null}
+      </section>
+
+      <section
+        ref={formSectionRef}
+        className="grid gap-3 rounded-2xl border border-white/10 bg-white/5 p-4"
+      >
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="font-display text-xl text-ink-0">Submit new event</h2>
           <button
@@ -82,12 +136,13 @@ export function EventsPage() {
             onClick={() => setShowForm((current) => !current)}
             disabled={writeDisabled}
           >
-            {showForm ? "Hide form" : "Open form"}
+            {showForm ? "Hide form" : "Open form panel"}
           </button>
         </div>
 
         <p className="text-xs text-ink-2">
-          Required escrow: {escrowAmount ? escrowAmount.toString() : "Loading..."} octas.
+          Required escrow:{" "}
+          {escrowAmount ? formatCedraFromOctas(escrowAmount) : "Loading..."}.
           Approved and rejected refunds follow contract fee rules.
         </p>
 

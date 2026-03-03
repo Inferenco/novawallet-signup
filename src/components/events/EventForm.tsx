@@ -1,7 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { fromUnixSeconds } from "@/lib/format";
+import { formatCedraFromOctas, fromUnixSeconds } from "@/lib/format";
 
 const urlSchema = z
   .string()
@@ -210,7 +210,8 @@ export function EventForm({
 
       {mode === "submit" && escrowAmount !== undefined ? (
         <p className="rounded-lg border border-white/10 bg-bg-1 p-3 text-xs text-ink-2">
-          Required escrow deposit: <span className="text-ink-0">{escrowAmount.toString()} octas</span>
+          Required escrow deposit:{" "}
+          <span className="text-ink-0">{formatCedraFromOctas(escrowAmount)}</span>
           . On approval or rejection, refunds are handled by the contract treasury rules.
         </p>
       ) : null}
