@@ -1,19 +1,29 @@
+import { GlassCard } from "@/components/ui";
+
 export function GamesPage() {
   return (
-    <section className="grid gap-4 rounded-3xl border border-white/10 bg-white/5 p-8">
-      <p className="inline-flex w-fit rounded-full border border-accent-0/30 bg-accent-1/15 px-3 py-1 text-xs uppercase tracking-[0.16em] text-accent-0">
-        Coming Soon
+    <GlassCard as="section" className="grid gap-nova-lg p-nova-xxl">
+      <span className="nova-badge nova-badge-info w-fit">Coming Soon</span>
+      <h1 className="text-display text-text-primary">Nova Games</h1>
+      <p className="max-w-3xl text-body leading-relaxed text-text-secondary">
+        The Nova gaming suite is being prepared for browser rollout. This
+        section will host on-chain poker and additional game experiences in
+        upcoming releases.
       </p>
-      <h1 className="font-display text-4xl text-ink-0">Nova Games</h1>
-      <p className="max-w-3xl text-base leading-7 text-ink-1">
-        The Nova gaming suite is being prepared for browser rollout. This section will
-        host on-chain poker and additional game experiences in upcoming releases.
-      </p>
-      <div className="grid gap-3 rounded-2xl border border-white/10 bg-bg-1 p-4 text-sm text-ink-2 md:grid-cols-3">
-        <p>Wallet-native game sessions</p>
-        <p>On-chain fair-play mechanics</p>
-        <p>Expanded single and multiplayer formats</p>
-      </div>
-    </section>
+      <GlassCard className="grid gap-nova-md text-body text-text-muted md:grid-cols-3">
+        <div className="flex items-center gap-nova-sm">
+          <span className="h-2 w-2 rounded-full bg-nova-cyan" />
+          Wallet-native game sessions
+        </div>
+        <div className="flex items-center gap-nova-sm">
+          <span className="h-2 w-2 rounded-full bg-nova-violet" />
+          On-chain fair-play mechanics
+        </div>
+        <div className="flex items-center gap-nova-sm">
+          <span className="h-2 w-2 rounded-full bg-nova-blue" />
+          Expanded single and multiplayer formats
+        </div>
+      </GlassCard>
+    </GlassCard>
   );
 }

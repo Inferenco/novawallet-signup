@@ -1,25 +1,151 @@
 :root {
   color-scheme: dark;
-  --bg-0: #040913;
-  --bg-1: #0a1526;
-  --bg-2: #10213a;
-  --ink-0: #e8f2ff;
-  --ink-1: #b7d1eb;
-  --ink-2: #84a4c4;
-  --a-0: #36e8ff;
-  --a-1: #1c8cff;
-  --a-2: #0e55dd;
+
+  /* Nova Wallet Brand Colors */
+  --nova-blue: #3D7AFF;
+  --nova-blue-dark: #2D6CFF;
+  --nova-blue-light: #6A9FFF;
+  --nova-cyan: #22E8FF;
+  --nova-cyan-dark: #18E0FF;
+  --nova-violet: #8B5CF6;
+  --nova-violet-dark: #6D28D9;
+  --nova-violet-light: #A78BFA;
+
+  /* Dark Theme Backgrounds */
+  --bg-primary: #0d0d14;
+  --bg-secondary: #14141e;
+  --bg-tertiary: #1c1c32;
+
+  /* Surfaces */
+  --surface-card: rgba(26, 26, 46, 0.8);
+  --surface-sheet: #12121a;
+  --surface-glass: rgba(255, 255, 255, 0.05);
+  --surface-glass-border: rgba(255, 255, 255, 0.1);
+  --surface-elevated: rgba(17, 17, 30, 0.9);
+
+  /* Text */
+  --text-primary: #FFFFFF;
+  --text-secondary: rgba(255, 255, 255, 0.75);
+  --text-muted: rgba(255, 255, 255, 0.55);
+  --text-inverse: #0d0d14;
+
+  /* Borders */
+  --border-subtle: rgba(45, 108, 255, 0.2);
+  --border-strong: rgba(45, 108, 255, 0.4);
+  --border-focus: rgba(45, 108, 255, 0.6);
+
+  /* Status Colors */
+  --status-success: #10B981;
+  --status-success-bg: rgba(16, 185, 129, 0.12);
+  --status-success-border: rgba(16, 185, 129, 0.3);
+  --status-warning: #F59E0B;
+  --status-warning-bg: rgba(245, 158, 11, 0.12);
+  --status-warning-border: rgba(245, 158, 11, 0.3);
+  --status-error: #EF4444;
+  --status-error-bg: rgba(239, 68, 68, 0.12);
+  --status-error-border: rgba(239, 68, 68, 0.3);
+  --status-info: #18E0FF;
+  --status-info-bg: rgba(24, 224, 255, 0.12);
+  --status-info-border: rgba(24, 224, 255, 0.3);
+
+  /* Overlays */
+  --overlay-scrim: rgba(0, 0, 0, 0.6);
+  --overlay-highlight: rgba(255, 255, 255, 0.08);
+
+  /* Shadows */
+  --shadow-color: rgba(45, 108, 255, 0.4);
+
+  /* Spacing (8pt grid) */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 20px;
+  --space-xxl: 24px;
+  --space-xxxl: 32px;
+  --space-xxxxl: 40px;
+
+  /* Border Radii */
+  --radius-micro: 8px;
+  --radius-small: 12px;
+  --radius-standard: 16px;
+  --radius-large: 20px;
+  --radius-hero: 24px;
+  --radius-round: 9999px;
+
+  /* Legacy mappings for backward compatibility */
+  --bg-0: var(--bg-primary);
+  --bg-1: var(--bg-secondary);
+  --bg-2: var(--bg-tertiary);
+  --ink-0: var(--text-primary);
+  --ink-1: var(--text-secondary);
+  --ink-2: var(--text-muted);
+  --a-0: var(--nova-cyan);
+  --a-1: var(--nova-blue);
+  --a-2: var(--nova-violet);
 }
 
 :root[data-theme="light"] {
   color-scheme: light;
-  --bg-0: #f3f8ff;
-  --bg-1: #e2edff;
-  --bg-2: #cedffd;
-  --ink-0: #09172f;
-  --ink-1: #1d3252;
-  --ink-2: #3f5678;
-  --a-0: #006ac3;
-  --a-1: #0056ab;
-  --a-2: #01458a;
+
+  /* Light Theme Brand Adjustments */
+  --nova-blue: #2D6CFF;
+  --nova-blue-dark: #1E54CC;
+  --nova-cyan: #18E0FF;
+  --nova-violet: #8B5CF6;
+
+  /* Light Theme Backgrounds */
+  --bg-primary: #F7F8FC;
+  --bg-secondary: #FFFFFF;
+  --bg-tertiary: #EEF1F8;
+
+  /* Surfaces */
+  --surface-card: rgba(255, 255, 255, 0.9);
+  --surface-sheet: #FFFFFF;
+  --surface-glass: rgba(255, 255, 255, 0.7);
+  --surface-glass-border: rgba(15, 23, 42, 0.08);
+  --surface-elevated: rgba(255, 255, 255, 0.95);
+
+  /* Text */
+  --text-primary: #0A1021;
+  --text-secondary: rgba(10, 16, 33, 0.75);
+  --text-muted: rgba(10, 16, 33, 0.55);
+  --text-inverse: #FFFFFF;
+
+  /* Borders */
+  --border-subtle: rgba(45, 108, 255, 0.18);
+  --border-strong: rgba(45, 108, 255, 0.35);
+  --border-focus: rgba(45, 108, 255, 0.5);
+
+  /* Status Colors (adjusted for light) */
+  --status-success: #0F9D6A;
+  --status-success-bg: rgba(15, 157, 106, 0.12);
+  --status-success-border: rgba(15, 157, 106, 0.3);
+  --status-warning: #D97706;
+  --status-warning-bg: rgba(217, 119, 6, 0.12);
+  --status-warning-border: rgba(217, 119, 6, 0.3);
+  --status-error: #DC2626;
+  --status-error-bg: rgba(220, 38, 38, 0.12);
+  --status-error-border: rgba(220, 38, 38, 0.3);
+  --status-info: #0FB5E8;
+  --status-info-bg: rgba(15, 181, 232, 0.12);
+  --status-info-border: rgba(15, 181, 232, 0.3);
+
+  /* Overlays */
+  --overlay-scrim: rgba(2, 6, 23, 0.35);
+  --overlay-highlight: rgba(45, 108, 255, 0.08);
+
+  /* Shadows */
+  --shadow-color: rgba(15, 23, 42, 0.18);
+
+  /* Legacy mappings */
+  --bg-0: var(--bg-primary);
+  --bg-1: var(--bg-secondary);
+  --bg-2: var(--bg-tertiary);
+  --ink-0: var(--text-primary);
+  --ink-1: var(--text-secondary);
+  --ink-2: var(--text-muted);
+  --a-0: var(--nova-cyan);
+  --a-1: var(--nova-blue);
+  --a-2: var(--nova-violet);
 }

@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { formatDateTime, shortAddress } from "@/lib/format";
 import type { EventRecord } from "@/services/events/types";
 import { StatusBadge } from "./StatusBadge";
+import { GlassCard } from "@/components/ui";
 
 interface EventCardProps {
   event: EventRecord;
@@ -10,52 +11,58 @@ interface EventCardProps {
 
 export function EventCard({ event, actions }: EventCardProps) {
   return (
-    <article className="grid gap-3 rounded-2xl border border-white/10 bg-white/5 p-4">
-      <div className="flex flex-wrap items-start justify-between gap-2">
+    <GlassCard as="article" className="grid gap-nova-md" pressable={!actions}>
+      <div className="flex flex-wrap items-start justify-between gap-nova-sm">
         <div>
-          <h3 className="font-display text-lg text-ink-0">{event.title}</h3>
-          <p className="text-xs text-ink-2">by {shortAddress(event.submitter)}</p>
+          <h3 className="text-h3 text-text-primary">{event.title}</h3>
+          <p className="text-caption text-text-muted">
+            by {shortAddress(event.submitter)}
+          </p>
         </div>
         <StatusBadge status={event.status} />
       </div>
 
-      <p className="text-sm text-ink-1">{event.description}</p>
+      <p className="text-body text-text-secondary">{event.description}</p>
 
-      <div className="grid gap-1 text-xs text-ink-2">
+      <div className="grid gap-nova-xs text-caption text-text-muted">
         <p>
-          <span className="text-ink-1">Category:</span> {event.category}
+          <span className="text-text-secondary">Category:</span> {event.category}
         </p>
         <p>
-          <span className="text-ink-1">Schedule:</span>{" "}
+          <span className="text-text-secondary">Schedule:</span>{" "}
           {event.isTba
             ? "To be announced"
-            : `${formatDateTime(event.startTimestamp)} to ${formatDateTime(
+            : `${formatDateTime(event.startTimestamp)} - ${formatDateTime(
                 event.endTimestamp
               )}`}
         </p>
       </div>
 
-      {event.imageUrl ? (
+      {event.imageUrl && (
         <img
           src={event.imageUrl}
           alt={`${event.title} cover`}
-          className="h-40 w-full rounded-xl object-cover"
+          className="h-40 w-full rounded-nova-small object-cover"
           loading="lazy"
         />
-      ) : null}
+      )}
 
-      {event.eventUrl ? (
+      {event.eventUrl && (
         <a
           href={event.eventUrl}
           target="_blank"
           rel="noreferrer"
-          className="text-sm text-accent-0 underline"
+          className="text-body text-nova-cyan hover:underline"
         >
           Event link
         </a>
-      ) : null}
+      )}
 
-      {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}
-    </article>
+      {actions && (
+        <div className="flex flex-wrap gap-nova-sm border-t border-surface-glass-border pt-nova-md">
+          {actions}
+        </div>
+      )}
+    </GlassCard>
   );
 }

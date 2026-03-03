@@ -5,6 +5,7 @@ import { useWallet } from "@/providers/WalletProvider";
 interface NavBarProps {
   theme: "dark" | "light";
   onToggleTheme: () => void;
+  hideThemeToggle?: boolean;
 }
 
 const navItems = [
@@ -12,35 +13,38 @@ const navItems = [
   { to: "/events", label: "Events" },
   { to: "/my-events", label: "My Events" },
   { to: "/games", label: "Games" },
-  { to: "/privacy", label: "Privacy" }
 ];
 
-export function NavBar({ theme, onToggleTheme }: NavBarProps) {
+export function NavBar({ theme, onToggleTheme, hideThemeToggle }: NavBarProps) {
   const { networkMismatch } = useWallet();
 
   return (
-    <header className="sticky top-0 z-30 border-b border-white/10 bg-bg-0/80 backdrop-blur">
-      <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3">
-        <NavLink to="/" className="inline-flex items-center gap-2">
-          <img src="/nova-logo.png" alt="Nova logo" className="h-8 w-8" />
+    <header className="sticky top-0 z-30 border-b border-surface-glass-border bg-bg-primary/80 backdrop-blur-xl">
+      <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-nova-md px-nova-lg py-nova-md">
+        <NavLink to="/" className="inline-flex items-center gap-nova-sm">
+          <img
+            src="/nova-logo.png"
+            alt="Nova logo"
+            className="h-8 w-8 rounded-nova-micro"
+          />
           <div>
-            <p className="font-display text-sm font-semibold uppercase tracking-[0.16em] text-ink-0">
+            <p className="text-body font-semibold text-text-primary">
               Nova Ecosystem
             </p>
-            <p className="text-xs text-ink-2">Cedra Browser dApp</p>
+            <p className="text-caption text-text-muted">Cedra dApp</p>
           </div>
         </NavLink>
 
-        <nav className="flex items-center gap-2">
+        <nav className="flex items-center gap-nova-xs">
           {navItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
               className={({ isActive }) =>
-                `rounded-full px-3 py-1.5 text-sm transition ${
+                `min-h-touch flex items-center rounded-nova-round px-nova-md py-nova-sm text-body transition-colors ${
                   isActive
-                    ? "bg-white/10 text-ink-0"
-                    : "text-ink-2 hover:bg-white/5 hover:text-ink-1"
+                    ? "bg-surface-glass font-medium text-text-primary"
+                    : "text-text-secondary hover:bg-surface-glass/50 hover:text-text-primary"
                 }`
               }
             >
@@ -49,22 +53,26 @@ export function NavBar({ theme, onToggleTheme }: NavBarProps) {
           ))}
         </nav>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={onToggleTheme}
-            className="rounded-full border border-white/20 px-3 py-1.5 text-xs text-ink-1 transition hover:border-white/40 hover:text-ink-0"
-            type="button"
-          >
-            {theme === "dark" ? "Light" : "Dark"} Mode
-          </button>
+        <div className="flex items-center gap-nova-sm">
+          {!hideThemeToggle && (
+            <button
+              onClick={onToggleTheme}
+              className="nova-btn nova-btn-ghost nova-btn-sm"
+              type="button"
+              aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+            >
+              {theme === "dark" ? "Light" : "Dark"}
+            </button>
+          )}
           <WalletButton />
         </div>
       </div>
-      {networkMismatch ? (
-        <div className="border-t border-amber-400/20 bg-amber-950/50 px-4 py-2 text-center text-xs text-amber-100">
-          Wallet network mismatch. Switch to Cedra Testnet to submit or manage events.
+
+      {networkMismatch && (
+        <div className="border-t border-status-warning-border bg-status-warning-bg px-nova-lg py-nova-sm text-center text-caption text-status-warning">
+          Network mismatch. Switch to Cedra Testnet to submit or manage events.
         </div>
-      ) : null}
+      )}
     </header>
   );
 }

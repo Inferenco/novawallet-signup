@@ -2,24 +2,28 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { formatCedraFromOctas, fromUnixSeconds } from "@/lib/format";
+import { NovaInput, NovaTextarea, NovaButton, GlassCard } from "@/components/ui";
 
 const urlSchema = z
   .string()
   .trim()
   .refine((value) => value === "" || z.string().url().safeParse(value).success, {
-    message: "Please enter a valid URL."
+    message: "Please enter a valid URL.",
   });
 
 const eventFormSchema = z
   .object({
     title: z.string().trim().min(2, "Title is required."),
-    description: z.string().trim().min(10, "Description must be at least 10 characters."),
+    description: z
+      .string()
+      .trim()
+      .min(10, "Description must be at least 10 characters."),
     category: z.string().trim().min(2, "Category is required."),
     imageUrl: urlSchema,
     eventUrl: urlSchema,
     isTba: z.boolean(),
     startAt: z.string().optional(),
-    endAt: z.string().optional()
+    endAt: z.string().optional(),
   })
   .superRefine((value, ctx) => {
     if (value.isTba) return;
@@ -28,7 +32,7 @@ const eventFormSchema = z
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["startAt"],
-        message: "Start date/time is required."
+        message: "Start date/time is required.",
       });
     }
 
@@ -36,7 +40,7 @@ const eventFormSchema = z
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["endAt"],
-        message: "End date/time is required."
+        message: "End date/time is required.",
       });
     }
 
@@ -48,7 +52,7 @@ const eventFormSchema = z
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["endAt"],
-          message: "End time must be after start time."
+          message: "End time must be after start time.",
         });
       }
     }
@@ -74,7 +78,7 @@ export function EventForm({
   initialValues,
   onSubmit,
   isSubmitting,
-  submitLabel
+  submitLabel,
 }: EventFormProps) {
   const form = useForm<EventFormValues>({
     resolver: zodResolver(eventFormSchema),
@@ -92,142 +96,131 @@ export function EventForm({
           : ""),
       endAt:
         initialValues?.endAt ??
-        (initialValues?.endTimestamp ? fromUnixSeconds(initialValues.endTimestamp) : "")
-    }
+        (initialValues?.endTimestamp
+          ? fromUnixSeconds(initialValues.endTimestamp)
+          : ""),
+    },
   });
 
   const isTba = form.watch("isTba");
 
   return (
     <form
-      className="grid gap-3"
+      className="grid gap-nova-lg"
       onSubmit={form.handleSubmit(async (values) => {
         await onSubmit(values);
       })}
       noValidate
     >
-      <div className="grid gap-2">
-        <label htmlFor="title" className="text-sm text-ink-1">
-          Title
-        </label>
-        <input
-          id="title"
-          className="rounded-lg border border-white/20 bg-bg-1 px-3 py-2 text-sm text-ink-0"
-          placeholder="Event title"
-          {...form.register("title")}
+      <NovaInput
+        label="Title"
+        placeholder="Event title"
+        error={form.formState.errors.title?.message}
+        {...form.register("title")}
+      />
+
+      <NovaTextarea
+        label="Description"
+        placeholder="Describe the event"
+        error={form.formState.errors.description?.message}
+        {...form.register("description")}
+      />
+
+      <div className="grid gap-nova-lg md:grid-cols-2">
+        <NovaInput
+          label="Category"
+          placeholder="Community, Workshop, Tournament"
+          error={form.formState.errors.category?.message}
+          {...form.register("category")}
         />
-        <FieldError message={form.formState.errors.title?.message} />
-      </div>
 
-      <div className="grid gap-2">
-        <label htmlFor="description" className="text-sm text-ink-1">
-          Description
-        </label>
-        <textarea
-          id="description"
-          className="min-h-28 rounded-lg border border-white/20 bg-bg-1 px-3 py-2 text-sm text-ink-0"
-          placeholder="Describe the event"
-          {...form.register("description")}
-        />
-        <FieldError message={form.formState.errors.description?.message} />
-      </div>
-
-      <div className="grid gap-2 md:grid-cols-2">
-        <div>
-          <label htmlFor="category" className="text-sm text-ink-1">
-            Category
-          </label>
-          <input
-            id="category"
-            className="mt-2 w-full rounded-lg border border-white/20 bg-bg-1 px-3 py-2 text-sm text-ink-0"
-            placeholder="Community, Workshop, Tournament"
-            {...form.register("category")}
-          />
-          <FieldError message={form.formState.errors.category?.message} />
-        </div>
-
-        <div>
-          <label htmlFor="imageUrl" className="text-sm text-ink-1">
-            Image URL
-          </label>
-          <input
-            id="imageUrl"
-            className="mt-2 w-full rounded-lg border border-white/20 bg-bg-1 px-3 py-2 text-sm text-ink-0"
-            placeholder="https://..."
-            {...form.register("imageUrl")}
-          />
-          <FieldError message={form.formState.errors.imageUrl?.message} />
-        </div>
-      </div>
-
-      <div className="grid gap-2">
-        <label htmlFor="eventUrl" className="text-sm text-ink-1">
-          Event URL
-        </label>
-        <input
-          id="eventUrl"
-          className="rounded-lg border border-white/20 bg-bg-1 px-3 py-2 text-sm text-ink-0"
+        <NovaInput
+          label="Image URL"
           placeholder="https://..."
-          {...form.register("eventUrl")}
+          error={form.formState.errors.imageUrl?.message}
+          {...form.register("imageUrl")}
         />
-        <FieldError message={form.formState.errors.eventUrl?.message} />
       </div>
 
-      <label className="inline-flex items-center gap-2 text-sm text-ink-1">
-        <input type="checkbox" {...form.register("isTba")} />
+      <NovaInput
+        label="Event URL"
+        placeholder="https://..."
+        error={form.formState.errors.eventUrl?.message}
+        {...form.register("eventUrl")}
+      />
+
+      <label className="inline-flex cursor-pointer items-center gap-nova-sm text-body text-text-secondary">
+        <input
+          type="checkbox"
+          className="h-5 w-5 rounded-nova-micro border-surface-glass-border bg-surface-glass accent-nova-blue"
+          {...form.register("isTba")}
+        />
         This event date is TBA
       </label>
 
-      {!isTba ? (
-        <div className="grid gap-2 md:grid-cols-2">
-          <div>
-            <label htmlFor="startAt" className="text-sm text-ink-1">
+      {!isTba && (
+        <div className="grid gap-nova-lg md:grid-cols-2">
+          <div className="grid gap-nova-sm">
+            <label
+              htmlFor="startAt"
+              className="text-caption font-medium text-text-secondary"
+            >
               Start date/time
             </label>
             <input
               id="startAt"
               type="datetime-local"
-              className="mt-2 w-full rounded-lg border border-white/20 bg-bg-1 px-3 py-2 text-sm text-ink-0"
+              className="nova-input"
               {...form.register("startAt")}
             />
-            <FieldError message={form.formState.errors.startAt?.message} />
+            {form.formState.errors.startAt?.message && (
+              <p className="text-caption text-status-error">
+                {form.formState.errors.startAt.message}
+              </p>
+            )}
           </div>
 
-          <div>
-            <label htmlFor="endAt" className="text-sm text-ink-1">
+          <div className="grid gap-nova-sm">
+            <label
+              htmlFor="endAt"
+              className="text-caption font-medium text-text-secondary"
+            >
               End date/time
             </label>
             <input
               id="endAt"
               type="datetime-local"
-              className="mt-2 w-full rounded-lg border border-white/20 bg-bg-1 px-3 py-2 text-sm text-ink-0"
+              className="nova-input"
               {...form.register("endAt")}
             />
-            <FieldError message={form.formState.errors.endAt?.message} />
+            {form.formState.errors.endAt?.message && (
+              <p className="text-caption text-status-error">
+                {form.formState.errors.endAt.message}
+              </p>
+            )}
           </div>
         </div>
-      ) : null}
+      )}
 
-      {mode === "submit" && escrowAmount !== undefined ? (
-        <p className="rounded-lg border border-white/10 bg-bg-1 p-3 text-xs text-ink-2">
+      {mode === "submit" && escrowAmount !== undefined && (
+        <GlassCard className="text-caption text-text-muted">
           Required escrow deposit:{" "}
-          <span className="text-ink-0">{formatCedraFromOctas(escrowAmount)}</span>
-          . On approval or rejection, refunds are handled by the contract treasury rules.
-        </p>
-      ) : null}
+          <span className="font-medium text-text-primary">
+            {formatCedraFromOctas(escrowAmount)}
+          </span>
+          . On approval or rejection, refunds are handled by the contract
+          treasury rules.
+        </GlassCard>
+      )}
 
-      <button
+      <NovaButton
         type="submit"
-        className="mt-2 rounded-lg border border-accent-0/50 bg-accent-1/25 px-4 py-2 text-sm font-semibold text-ink-0 transition hover:bg-accent-1/35 disabled:opacity-50"
-        disabled={isSubmitting}
+        variant="accent"
+        fullWidth
+        loading={isSubmitting}
       >
-        {isSubmitting ? "Submitting..." : submitLabel}
-      </button>
+        {submitLabel}
+      </NovaButton>
     </form>
   );
-}
-
-function FieldError({ message }: { message?: string }) {
-  if (!message) return null;
-  return <p className="mt-1 text-xs text-rose-300">{message}</p>;
 }

@@ -1,24 +1,21 @@
 import { useMemo, useState } from "react";
-import { EventForm, type EventFormValues } from "@/components/events/EventForm";
+import {
+  EventForm,
+  type EventFormValues,
+} from "@/components/events/EventForm";
 import { EventList } from "@/components/events/EventList";
 import {
   useUserEventsQuery,
-  useUserPendingEventsQuery
+  useUserPendingEventsQuery,
 } from "@/hooks/events/useEventQueries";
 import { useEventMutations } from "@/hooks/events/useEventMutations";
 import { mapErrorMessage, toUnixSeconds } from "@/lib/format";
 import type { EventRecord } from "@/services/events/types";
 import { useToast } from "@/providers/ToastProvider";
 import { useWallet } from "@/providers/WalletProvider";
+import { GlassCard, NovaButton } from "@/components/ui";
 
 const PAGE_SIZE = 20;
-
-function actionButtonClassName(kind: "danger" | "neutral" = "neutral") {
-  if (kind === "danger") {
-    return "rounded-lg border border-rose-300/40 px-3 py-2 text-xs text-rose-100 transition hover:bg-rose-500/20";
-  }
-  return "rounded-lg border border-white/20 px-3 py-2 text-xs text-ink-1 transition hover:border-white/40 hover:text-ink-0";
-}
 
 export function MyEventsPage() {
   const wallet = useWallet();
@@ -30,81 +27,91 @@ export function MyEventsPage() {
   const userEventsQuery = useUserEventsQuery({
     address: accountAddress,
     page: 0,
-    pageSize: PAGE_SIZE
+    pageSize: PAGE_SIZE,
   });
   const userPendingQuery = useUserPendingEventsQuery({
     address: accountAddress,
     page: 0,
-    pageSize: PAGE_SIZE
+    pageSize: PAGE_SIZE,
   });
 
   const {
     cancelPendingMutation,
     cancelLiveMutation,
-    submitEditRequestMutation
+    submitEditRequestMutation,
   } = useEventMutations();
 
   const sections = useMemo(() => {
     const events = userEventsQuery.data ?? [];
     return {
       live: events.filter((event) => event.status === "Live"),
-      upcoming: events.filter((event) => event.status === "Upcoming" || event.status === "TBA"),
-      past: events.filter((event) => event.status === "Past")
+      upcoming: events.filter(
+        (event) => event.status === "Upcoming" || event.status === "TBA"
+      ),
+      past: events.filter((event) => event.status === "Past"),
     };
   }, [userEventsQuery.data]);
 
   if (!wallet.connected || !accountAddress) {
     return (
-      <section className="rounded-2xl border border-white/10 bg-white/5 p-6 text-center">
-        <h1 className="font-display text-3xl text-ink-0">My Events</h1>
-        <p className="mt-2 text-sm text-ink-2">
-          Connect your wallet to view pending submissions and approved event listings.
+      <GlassCard as="section" className="py-nova-xxxl text-center">
+        <h1 className="text-h1 text-text-primary">My Events</h1>
+        <p className="mt-nova-sm text-body text-text-muted">
+          Connect your wallet to view pending submissions and approved event
+          listings.
         </p>
-      </section>
+      </GlassCard>
     );
   }
 
   if (wallet.networkMismatch) {
     return (
-      <section className="rounded-2xl border border-amber-300/30 bg-amber-950/50 p-6">
-        <h1 className="font-display text-3xl text-amber-100">Network mismatch</h1>
-        <p className="mt-2 text-sm text-amber-50">
+      <GlassCard
+        as="section"
+        className="border-status-warning-border bg-status-warning-bg py-nova-xxl"
+      >
+        <h1 className="text-h1 text-status-warning">Network mismatch</h1>
+        <p className="mt-nova-sm text-body text-text-primary">
           Switch your wallet to Cedra Testnet to load and manage your events.
         </p>
-      </section>
+      </GlassCard>
     );
   }
 
   return (
-    <section className="grid gap-6">
+    <section className="grid gap-nova-xl">
       <header>
-        <h1 className="font-display text-3xl text-ink-0">My Events</h1>
-        <p className="text-sm text-ink-2">
+        <h1 className="text-h1 text-text-primary">My Events</h1>
+        <p className="text-body text-text-muted">
           Manage pending submissions and your live/upcoming/past events.
         </p>
       </header>
 
-      <section className="grid gap-3 rounded-2xl border border-white/10 bg-white/5 p-4">
-        <h2 className="font-display text-xl text-ink-0">Pending Submissions</h2>
+      {/* Pending Submissions */}
+      <GlassCard as="section" className="grid gap-nova-md">
+        <h2 className="text-h2 text-text-primary">Pending Submissions</h2>
         {userPendingQuery.isLoading ? (
-          <p className="text-sm text-ink-2">Loading pending submissions...</p>
+          <p className="text-body text-text-muted">
+            Loading pending submissions...
+          </p>
         ) : (userPendingQuery.data?.length ?? 0) === 0 ? (
-          <p className="text-sm text-ink-2">No pending submissions.</p>
+          <p className="text-body text-text-muted">No pending submissions.</p>
         ) : (
-          <div className="grid gap-3">
+          <div className="grid gap-nova-md">
             {userPendingQuery.data?.map((pending) => (
-              <article
-                key={pending.pendingId}
-                className="rounded-xl border border-white/10 bg-bg-1 p-4"
-              >
-                <div className="flex flex-wrap items-start justify-between gap-2">
+              <GlassCard key={pending.pendingId} className="grid gap-nova-sm">
+                <div className="flex flex-wrap items-start justify-between gap-nova-sm">
                   <div>
-                    <h3 className="font-display text-lg text-ink-0">{pending.title}</h3>
-                    <p className="text-xs text-ink-2">Pending ID: {pending.pendingId}</p>
+                    <h3 className="text-h3 text-text-primary">
+                      {pending.title}
+                    </h3>
+                    <p className="text-caption text-text-muted">
+                      Pending ID: {pending.pendingId}
+                    </p>
                   </div>
-                  <button
-                    type="button"
-                    className={actionButtonClassName("danger")}
+                  <NovaButton
+                    variant="danger"
+                    size="sm"
                     disabled={cancelPendingMutation.isPending}
                     onClick={async () => {
                       try {
@@ -113,7 +120,7 @@ export function MyEventsPage() {
                         );
                         pushToast("success", "Pending event cancelled.", {
                           actionHref: tx.explorerUrl,
-                          actionLabel: "View transaction"
+                          actionLabel: "View transaction",
                         });
                       } catch (error) {
                         pushToast("error", mapErrorMessage(error));
@@ -121,33 +128,36 @@ export function MyEventsPage() {
                     }}
                   >
                     Cancel Pending
-                  </button>
+                  </NovaButton>
                 </div>
-                <p className="mt-2 text-sm text-ink-1">{pending.description}</p>
-              </article>
+                <p className="text-body text-text-secondary">
+                  {pending.description}
+                </p>
+              </GlassCard>
             ))}
           </div>
         )}
-      </section>
+      </GlassCard>
 
-      <section className="grid gap-4">
-        <h2 className="font-display text-xl text-ink-0">Approved Events</h2>
+      {/* Approved Events */}
+      <section className="grid gap-nova-lg">
+        <h2 className="text-h2 text-text-primary">Approved Events</h2>
         <EventList
           events={[...sections.live, ...sections.upcoming, ...sections.past]}
           emptyTitle="No approved events yet"
           emptyCopy="Your approved events will appear here."
           renderActions={(event) => (
             <>
-              <button
-                type="button"
-                className={actionButtonClassName()}
+              <NovaButton
+                variant="ghost"
+                size="sm"
                 onClick={() => setEditTarget(event)}
               >
                 Submit Edit Request
-              </button>
-              <button
-                type="button"
-                className={actionButtonClassName("danger")}
+              </NovaButton>
+              <NovaButton
+                variant="danger"
+                size="sm"
                 disabled={cancelLiveMutation.isPending}
                 onClick={async () => {
                   if (!window.confirm("Cancel this live event?")) return;
@@ -156,7 +166,7 @@ export function MyEventsPage() {
                     const tx = await cancelLiveMutation.mutateAsync(event.id);
                     pushToast("success", "Live event cancelled.", {
                       actionHref: tx.explorerUrl,
-                      actionLabel: "View transaction"
+                      actionLabel: "View transaction",
                     });
                   } catch (error) {
                     pushToast("error", mapErrorMessage(error));
@@ -164,23 +174,24 @@ export function MyEventsPage() {
                 }}
               >
                 Cancel Live Event
-              </button>
+              </NovaButton>
             </>
           )}
         />
       </section>
 
-      {editTarget ? (
-        <section className="rounded-2xl border border-white/10 bg-white/5 p-4">
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <h2 className="font-display text-xl text-ink-0">Edit Request</h2>
-            <button
-              type="button"
-              className={actionButtonClassName()}
+      {/* Edit Request Modal */}
+      {editTarget && (
+        <GlassCard as="section" className="grid gap-nova-md">
+          <div className="flex items-center justify-between gap-nova-sm">
+            <h2 className="text-h2 text-text-primary">Edit Request</h2>
+            <NovaButton
+              variant="ghost"
+              size="sm"
               onClick={() => setEditTarget(null)}
             >
               Close
-            </button>
+            </NovaButton>
           </div>
           <EventForm
             mode="edit"
@@ -192,7 +203,7 @@ export function MyEventsPage() {
               eventUrl: editTarget.eventUrl,
               isTba: editTarget.isTba,
               startTimestamp: editTarget.startTimestamp,
-              endTimestamp: editTarget.endTimestamp
+              endTimestamp: editTarget.endTimestamp,
             }}
             submitLabel="Submit Edit Request"
             isSubmitting={submitEditRequestMutation.isPending}
@@ -208,21 +219,23 @@ export function MyEventsPage() {
                   newStartTimestamp: values.isTba
                     ? 0
                     : toUnixSeconds(values.startAt || ""),
-                  newEndTimestamp: values.isTba ? 0 : toUnixSeconds(values.endAt || ""),
-                  newIsTba: values.isTba
+                  newEndTimestamp: values.isTba
+                    ? 0
+                    : toUnixSeconds(values.endAt || ""),
+                  newIsTba: values.isTba,
                 });
                 setEditTarget(null);
                 pushToast("success", "Edit request submitted.", {
                   actionHref: tx.explorerUrl,
-                  actionLabel: "View transaction"
+                  actionLabel: "View transaction",
                 });
               } catch (error) {
                 pushToast("error", mapErrorMessage(error));
               }
             }}
           />
-        </section>
-      ) : null}
+        </GlassCard>
+      )}
     </section>
   );
 }

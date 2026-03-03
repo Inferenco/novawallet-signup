@@ -5,7 +5,7 @@ import {
   useContext,
   useMemo,
   useState,
-  type PropsWithChildren
+  type PropsWithChildren,
 } from "react";
 
 type ToastKind = "success" | "error" | "info";
@@ -29,9 +29,10 @@ interface ToastContextValue {
 const ToastContext = createContext<ToastContextValue | null>(null);
 
 const kindClasses: Record<ToastKind, string> = {
-  success: "border-emerald-400/50 bg-emerald-950/70",
-  error: "border-rose-400/60 bg-rose-950/70",
-  info: "border-sky-400/50 bg-sky-950/70"
+  success:
+    "border-status-success-border bg-status-success-bg text-status-success",
+  error: "border-status-error-border bg-status-error-bg text-status-error",
+  info: "border-status-info-border bg-status-info-bg text-status-info",
 };
 
 export function ToastProvider({ children }: PropsWithChildren) {
@@ -51,8 +52,8 @@ export function ToastProvider({ children }: PropsWithChildren) {
           kind,
           message,
           actionHref: options?.actionHref,
-          actionLabel: options?.actionLabel
-        }
+          actionLabel: options?.actionLabel,
+        },
       ]);
       setTimeout(() => {
         setToasts((prev) => prev.filter((toast) => toast.id !== id));
@@ -66,24 +67,24 @@ export function ToastProvider({ children }: PropsWithChildren) {
   return (
     <ToastContext.Provider value={value}>
       {children}
-      <div className="pointer-events-none fixed right-4 top-4 z-50 flex max-w-sm flex-col gap-2">
+      <div className="pointer-events-none fixed right-nova-lg top-nova-lg z-50 flex max-w-sm flex-col gap-nova-sm">
         {toasts.map((toast) => (
           <div
             key={toast.id}
-            className={`pointer-events-auto rounded-xl border px-4 py-3 text-sm text-ink-0 shadow-xl ${kindClasses[toast.kind]}`}
+            className={`nova-toast nova-card pointer-events-auto border px-nova-lg py-nova-md shadow-xl ${kindClasses[toast.kind]}`}
             role="status"
           >
-            <p>{toast.message}</p>
-            {toast.actionHref && toast.actionLabel ? (
+            <p className="text-body text-text-primary">{toast.message}</p>
+            {toast.actionHref && toast.actionLabel && (
               <a
-                className="mt-2 inline-block text-xs font-semibold text-accent-0 underline"
+                className="mt-nova-sm inline-block text-caption font-semibold text-nova-cyan underline"
                 href={toast.actionHref}
                 target="_blank"
                 rel="noreferrer"
               >
                 {toast.actionLabel}
               </a>
-            ) : null}
+            )}
           </div>
         ))}
       </div>

@@ -1,13 +1,25 @@
 import { useMemo, useRef, useState } from "react";
 import { EventFilters } from "@/components/events/EventFilters";
-import { EventForm, type EventFormValues } from "@/components/events/EventForm";
+import {
+  EventForm,
+  type EventFormValues,
+} from "@/components/events/EventForm";
 import { EventList } from "@/components/events/EventList";
-import { useCategoryOptions, useEventFeesQuery, usePublicEventsQuery } from "@/hooks/events/useEventQueries";
+import {
+  useCategoryOptions,
+  useEventFeesQuery,
+  usePublicEventsQuery,
+} from "@/hooks/events/useEventQueries";
 import { useEventMutations } from "@/hooks/events/useEventMutations";
-import { formatCedraFromOctas, mapErrorMessage, toUnixSeconds } from "@/lib/format";
+import {
+  formatCedraFromOctas,
+  mapErrorMessage,
+  toUnixSeconds,
+} from "@/lib/format";
 import { useWallet } from "@/providers/WalletProvider";
 import { useToast } from "@/providers/ToastProvider";
 import { hasConfiguredWalletContract } from "@/config/env";
+import { GlassCard, NovaButton } from "@/components/ui";
 
 const PAGE_SIZE = 10;
 
@@ -21,12 +33,17 @@ export function EventsPage() {
   const wallet = useWallet();
   const { pushToast } = useToast();
   const feesQuery = useEventFeesQuery();
-  const eventsQuery = usePublicEventsQuery({ page, pageSize: PAGE_SIZE, category });
+  const eventsQuery = usePublicEventsQuery({
+    page,
+    pageSize: PAGE_SIZE,
+    category,
+  });
   const categoryOptions = useCategoryOptions(eventsQuery.data);
   const { submitEventMutation } = useEventMutations();
 
   const escrowAmount = feesQuery.data?.minEscrowFee;
-  const writeDisabled = !wallet.connected || wallet.connecting || wallet.networkMismatch;
+  const writeDisabled =
+    !wallet.connected || wallet.connecting || wallet.networkMismatch;
 
   const canGoNext = useMemo(
     () => (eventsQuery.data?.length ?? 0) === PAGE_SIZE,
@@ -37,7 +54,10 @@ export function EventsPage() {
     setShowForm(true);
 
     window.requestAnimationFrame(() => {
-      formSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      formSectionRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
     });
   };
 
@@ -55,46 +75,50 @@ export function EventsPage() {
       eventUrl: values.eventUrl || "",
       startTimestamp: values.isTba ? 0 : toUnixSeconds(values.startAt || ""),
       endTimestamp: values.isTba ? 0 : toUnixSeconds(values.endAt || ""),
-      isTba: values.isTba
+      isTba: values.isTba,
     });
 
     setLastTxHash(tx.hash);
     setShowForm(false);
     pushToast("success", "Event request submitted.", {
       actionHref: tx.explorerUrl,
-      actionLabel: "View transaction"
+      actionLabel: "View transaction",
     });
   };
 
   return (
-    <section className="grid gap-5">
-      <header className="grid gap-2">
-        <h1 className="font-display text-3xl text-ink-0">Events</h1>
-        <p className="text-sm text-ink-2">
+    <section className="grid gap-nova-xl">
+      <header className="grid gap-nova-sm">
+        <h1 className="text-h1 text-text-primary">Events</h1>
+        <p className="text-body text-text-muted">
           Browse approved community events and submit your own event request.
         </p>
       </header>
 
-      {!hasConfiguredWalletContract() ? (
-        <p className="rounded-xl border border-amber-300/30 bg-amber-950/50 p-3 text-sm text-amber-100">
-          Wallet contract address is not configured. Set VITE_WALLET_CONTRACT_ADDRESS to
-          enable on-chain calls.
-        </p>
-      ) : null}
+      {!hasConfiguredWalletContract() && (
+        <GlassCard className="border-status-warning-border bg-status-warning-bg text-body text-status-warning">
+          Wallet contract address is not configured. Set
+          VITE_WALLET_CONTRACT_ADDRESS to enable on-chain calls.
+        </GlassCard>
+      )}
 
-      <section className="relative overflow-hidden rounded-3xl border border-accent-0/30 bg-gradient-to-br from-accent-1/35 via-bg-1/85 to-bg-0 p-5 shadow-[0_0_60px_rgba(29,156,255,0.25)]">
-        <div className="nova-cta-glow" aria-hidden />
-        <div className="relative z-10 grid gap-4 lg:grid-cols-[1.2fr_auto] lg:items-center">
-          <div className="space-y-2">
-            <p className="w-fit rounded-full border border-accent-0/50 bg-bg-0/40 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-accent-0">
+      {/* Featured CTA Section */}
+      <section className="relative overflow-hidden rounded-nova-hero border border-nova-blue/30 bg-gradient-to-br from-nova-blue/25 via-bg-secondary/85 to-bg-primary p-nova-xl shadow-nova-glow">
+        <div
+          className="nova-section-glow -right-10 -top-20"
+          aria-hidden="true"
+        />
+        <div className="relative z-10 grid gap-nova-lg lg:grid-cols-[1.2fr_auto] lg:items-center">
+          <div className="space-y-nova-sm">
+            <span className="nova-badge nova-badge-info">
               Spotlight Your Event
-            </p>
-            <h2 className="font-display text-2xl text-ink-0 md:text-3xl">
+            </span>
+            <h2 className="text-h1 text-text-primary">
               Ready to publish your next event?
             </h2>
-            <p className="max-w-2xl text-sm text-ink-1">
-              Open the submission flow, fill out details, and send your on-chain request in
-              under a minute.
+            <p className="max-w-2xl text-body text-text-secondary">
+              Open the submission flow, fill out details, and send your on-chain
+              request in under a minute.
             </p>
           </div>
 
@@ -106,59 +130,60 @@ export function EventsPage() {
           >
             <span>Start Event Submission</span>
             <span aria-hidden className="cta-arrow">
-              →
+              &rarr;
             </span>
           </button>
         </div>
 
-        {!wallet.connected ? (
-          <p className="relative z-10 mt-3 text-xs text-ink-1/90">
-            Connect your wallet first, then use the button above to jump into the form.
+        {!wallet.connected && (
+          <p className="relative z-10 mt-nova-md text-caption text-text-muted">
+            Connect your wallet first, then use the button above to jump into
+            the form.
           </p>
-        ) : null}
+        )}
 
-        {wallet.networkMismatch ? (
-          <p className="relative z-10 mt-2 text-xs text-amber-100">
-            Your wallet is on the wrong network. Switch to Cedra Testnet to submit.
+        {wallet.networkMismatch && (
+          <p className="relative z-10 mt-nova-sm text-caption text-status-warning">
+            Your wallet is on the wrong network. Switch to Cedra Testnet to
+            submit.
           </p>
-        ) : null}
+        )}
       </section>
 
-      <section
-        ref={formSectionRef}
-        className="grid gap-3 rounded-2xl border border-white/10 bg-white/5 p-4"
-      >
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="font-display text-xl text-ink-0">Submit new event</h2>
-          <button
-            type="button"
-            className="rounded-lg border border-white/20 px-3 py-2 text-xs text-ink-1 transition hover:border-white/40 hover:text-ink-0"
+      {/* Submit Form Section */}
+      <section ref={formSectionRef}>
+      <GlassCard className="grid gap-nova-md">
+        <div className="flex flex-wrap items-center justify-between gap-nova-sm">
+          <h2 className="text-h2 text-text-primary">Submit new event</h2>
+          <NovaButton
+            variant="ghost"
+            size="sm"
             onClick={() => setShowForm((current) => !current)}
             disabled={writeDisabled}
           >
             {showForm ? "Hide form" : "Open form panel"}
-          </button>
+          </NovaButton>
         </div>
 
-        <p className="text-xs text-ink-2">
+        <p className="text-caption text-text-muted">
           Required escrow:{" "}
           {escrowAmount ? formatCedraFromOctas(escrowAmount) : "Loading..."}.
           Approved and rejected refunds follow contract fee rules.
         </p>
 
-        {wallet.networkMismatch ? (
-          <p className="text-xs text-amber-200">
+        {wallet.networkMismatch && (
+          <p className="text-caption text-status-warning">
             Switch your wallet network to Cedra Testnet before submitting.
           </p>
-        ) : null}
+        )}
 
-        {!wallet.connected ? (
-          <p className="text-xs text-ink-2">
+        {!wallet.connected && (
+          <p className="text-caption text-text-muted">
             Connect your wallet to submit events.
           </p>
-        ) : null}
+        )}
 
-        {showForm ? (
+        {showForm && (
           <EventForm
             mode="submit"
             escrowAmount={escrowAmount}
@@ -172,11 +197,14 @@ export function EventsPage() {
               }
             }}
           />
-        ) : null}
+        )}
 
-        {lastTxHash ? (
-          <p className="text-xs text-ink-2">Last submission hash: {lastTxHash}</p>
-        ) : null}
+        {lastTxHash && (
+          <p className="text-caption text-text-muted">
+            Last submission hash: <code>{lastTxHash}</code>
+          </p>
+        )}
+      </GlassCard>
       </section>
 
       <EventFilters
@@ -189,11 +217,11 @@ export function EventsPage() {
       />
 
       {eventsQuery.isLoading ? (
-        <p className="text-sm text-ink-2">Loading events...</p>
+        <p className="text-body text-text-muted">Loading events...</p>
       ) : eventsQuery.error ? (
-        <p className="rounded-xl border border-rose-400/40 bg-rose-950/40 p-3 text-sm text-rose-100">
+        <GlassCard className="border-status-error-border bg-status-error-bg text-body text-status-error">
           Failed to load events.
-        </p>
+        </GlassCard>
       ) : (
         <EventList
           events={eventsQuery.data ?? []}
@@ -202,23 +230,23 @@ export function EventsPage() {
         />
       )}
 
-      <div className="flex items-center justify-end gap-2">
-        <button
-          type="button"
-          className="rounded-lg border border-white/20 px-3 py-2 text-xs text-ink-1 transition hover:border-white/40 hover:text-ink-0 disabled:opacity-50"
+      <div className="flex items-center justify-end gap-nova-sm">
+        <NovaButton
+          variant="ghost"
+          size="sm"
           onClick={() => setPage((current) => Math.max(0, current - 1))}
           disabled={page === 0}
         >
           Previous
-        </button>
-        <button
-          type="button"
-          className="rounded-lg border border-white/20 px-3 py-2 text-xs text-ink-1 transition hover:border-white/40 hover:text-ink-0 disabled:opacity-50"
+        </NovaButton>
+        <NovaButton
+          variant="ghost"
+          size="sm"
           onClick={() => setPage((current) => current + 1)}
           disabled={!canGoNext}
         >
           Next
-        </button>
+        </NovaButton>
       </div>
     </section>
   );

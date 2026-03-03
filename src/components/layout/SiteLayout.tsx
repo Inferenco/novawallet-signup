@@ -1,30 +1,21 @@
 import { Outlet } from "react-router-dom";
-import { useEffect, useState } from "react";
 import { NavBar } from "./NavBar";
 import { Footer } from "./Footer";
-
-const THEME_STORAGE_KEY = "nova_theme_mode";
+import { LivingBackground } from "@/components/ui";
+import { useNovaThemeBridge } from "@/hooks/useNovaThemeBridge";
 
 export function SiteLayout() {
-  const [theme, setTheme] = useState<"dark" | "light">(() => {
-    const saved = window.localStorage.getItem(THEME_STORAGE_KEY);
-    return saved === "light" ? "light" : "dark";
-  });
-
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-    window.localStorage.setItem(THEME_STORAGE_KEY, theme);
-  }, [theme]);
+  const { theme, setTheme, isInNovaWallet } = useNovaThemeBridge();
 
   return (
-    <div className="min-h-screen bg-bg-0 text-ink-0">
+    <div className="relative min-h-screen bg-bg-primary text-text-primary">
+      <LivingBackground />
       <NavBar
         theme={theme}
-        onToggleTheme={() =>
-          setTheme((current) => (current === "dark" ? "light" : "dark"))
-        }
+        onToggleTheme={() => setTheme(theme === "dark" ? "light" : "dark")}
+        hideThemeToggle={isInNovaWallet}
       />
-      <main className="mx-auto w-full max-w-6xl px-4 py-8">
+      <main className="relative z-10 mx-auto w-full max-w-6xl px-nova-lg py-nova-xxl">
         <Outlet />
       </main>
       <Footer />
