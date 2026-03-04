@@ -10,6 +10,9 @@ export interface ChainConfig {
   rpcUrl: string;
   indexerUrl: string;
   walletContractAddress: string;
+  gameContractAddress: string;
+  gamesWalletContractAddress: string;
+  gamesIndexerUrl: string;
   tokenSymbol: string;
   tokenDecimals: number;
 }
@@ -22,6 +25,9 @@ export const CHAIN_CONFIG: ChainConfig = {
   rpcUrl: appEnv.fullnodeUrl,
   indexerUrl: appEnv.indexerUrl,
   walletContractAddress: appEnv.walletContractAddress,
+  gameContractAddress: appEnv.gameContractAddress,
+  gamesWalletContractAddress: appEnv.gamesWalletContractAddress,
+  gamesIndexerUrl: appEnv.gamesIndexerUrl,
   tokenSymbol: "CEDRA",
   tokenDecimals: 8
 };

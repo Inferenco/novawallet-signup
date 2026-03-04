@@ -1,0 +1,12 @@
+[package]
+name = "InferencoGames"
+version = "1.0.0"
+upgrade_policy = "compatible"
+
+[dependencies]
+CedraFramework = { git = "https://github.com/cedra-labs/cedra-framework.git", subdir = "cedra-framework", rev = "mainnet" }
+Wallet = { local = "../wallet" }
+
+[addresses]
+NovaWalletGames = "0xacc4854980ac0158c32dc55b145fbfbe5b0024d8314fa8a3859bc5bc9ff71098"
+wallet = "0xf23d1dafe928501a2c3cea8ef9b3c71522c5c576141c5b1d34a0b394e65f554e"

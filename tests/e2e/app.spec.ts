@@ -9,7 +9,7 @@ test("connect wallet and submit event flow", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Events" })).toBeVisible();
 
   await page.goto("/events");
-  await page.getByRole("button", { name: "Connect Wallet" }).click();
+  await page.getByRole("button", { name: "Connect" }).click();
   await page.getByRole("button", { name: "Mock Zedra" }).click();
 
   await page.getByRole("button", { name: "Start Event Submission" }).click();
@@ -30,9 +30,9 @@ test("connect wallet and submit event flow", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Pending Submissions" })).toBeVisible();
   await expect(page.getByText("E2E Event")).toBeVisible();
 
-  await page
-    .locator("article")
-    .filter({ hasText: "E2E Event" })
+  const e2ePendingHeader = page.getByRole("heading", { name: "E2E Event" });
+  await e2ePendingHeader
+    .locator("xpath=../..")
     .getByRole("button", { name: "Cancel Pending" })
     .click();
   await expect(page.getByText("Pending event cancelled.")).toBeVisible();
@@ -45,11 +45,11 @@ test("network mismatch blocks write actions", async ({ page }) => {
   });
 
   await page.goto("/events");
-  await page.getByRole("button", { name: "Connect Wallet" }).click();
+  await page.getByRole("button", { name: "Connect" }).click();
   await page.getByRole("button", { name: "Mock Zedra" }).click();
 
   await expect(
-    page.getByText("Wallet network mismatch. Switch to Cedra Testnet")
+    page.getByText(/Network mismatch\. Switch to Cedra Testnet/i)
   ).toBeVisible();
   await expect(page.getByRole("button", { name: "Start Event Submission" })).toBeDisabled();
 
@@ -58,9 +58,26 @@ test("network mismatch blocks write actions", async ({ page }) => {
   });
 });
 
-test("games and privacy pages render", async ({ page }) => {
+test("games routes and privacy pages render", async ({ page }) => {
   await page.goto("/games");
   await expect(page.getByRole("heading", { name: "Nova Games" })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Nova Casino/i })).toBeVisible();
+
+  await page.goto("/games/casino");
+  await expect(page.getByRole("heading", { name: "Chips & Boosts" })).toBeVisible();
+
+  await page.goto("/games/poker");
+  await expect(page.getByRole("heading", { name: "Poker Lobby" })).toBeVisible();
+
+  await page.goto("/games/poker/tables");
+  await expect(page.getByRole("heading", { name: "Poker Tables" })).toBeVisible();
+
+  await page.goto("/games/poker/create");
+  await expect(page.getByRole("heading", { name: "Create Poker Table" })).toBeVisible();
+
+  await page.goto("/games/poker/0xabc");
+  await expect(page.getByText("Missing table address.")).not.toBeVisible();
+  await expect(page.getByRole("link", { name: "Events" })).toHaveCount(0);
 
   await page.goto("/privacy");
   await expect(
