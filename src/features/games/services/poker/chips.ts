@@ -358,7 +358,7 @@ export function getTimeUntilNextClaim(lastClaimTime: number, claimPeriodSeconds:
     if (!lastClaimTime) return 0;
     const lastClaimMs = lastClaimTime < 1_000_000_000_000 ? lastClaimTime * 1000 : lastClaimTime;
     const nextEligible = lastClaimMs + claimPeriodSeconds * 1000;
-    return Math.max(0, nextEligible - Date.now());
+    return Math.max(0, Math.floor((nextEligible - Date.now()) / 1000));
 }
 
 // ============================================================================

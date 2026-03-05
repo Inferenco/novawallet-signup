@@ -59,13 +59,13 @@ export async function createTable(
     const resolvedName = sanitizedName.length >= 3 ? sanitizedName : 'Nova Table';
 
     return submitTransaction(network, signer, 'TEXAS_HOLDEM', 'create_table', [
-        params.smallBlind,
-        params.bigBlind,
-        params.minBuyIn,
-        params.maxBuyIn,
-        params.ante,
+        params.smallBlind.toString(),
+        params.bigBlind.toString(),
+        params.minBuyIn.toString(),
+        params.maxBuyIn.toString(),
+        params.ante.toString(),
         params.straddleEnabled,
-        MAX_SEATS, // Always 5 seats
+        MAX_SEATS.toString(), // Always 5 seats
         params.tableSpeed ?? 0,
         resolvedName,
         params.colorIndex ?? 0,
@@ -85,7 +85,7 @@ export async function joinTable(
     return submitTransaction(network, signer, 'TEXAS_HOLDEM', 'join_table', [
         tableAddress,
         seatIndex,
-        buyIn,
+        buyIn.toString(),
     ]);
 }
 
@@ -113,7 +113,7 @@ export async function topUp(
 ): Promise<TransactionResult> {
     return submitTransaction(network, signer, 'TEXAS_HOLDEM', 'top_up', [
         tableAddress,
-        amount,
+        amount.toString(),
     ]);
 }
 
@@ -279,7 +279,7 @@ export async function raiseTo(
 ): Promise<TransactionResult> {
     return submitTransaction(network, signer, 'TEXAS_HOLDEM', 'raise_to', [
         tableAddress,
-        amount,
+        amount.toString(),
     ]);
 }
 
@@ -437,8 +437,8 @@ export async function updateBlinds(
 ): Promise<TransactionResult> {
     return submitTransaction(network, signer, 'TEXAS_HOLDEM', 'update_blinds', [
         tableAddress,
-        smallBlind,
-        bigBlind,
+        smallBlind.toString(),
+        bigBlind.toString(),
     ]);
 }
 
@@ -453,7 +453,7 @@ export async function updateAnte(
 ): Promise<TransactionResult> {
     return submitTransaction(network, signer, 'TEXAS_HOLDEM', 'update_ante', [
         tableAddress,
-        ante,
+        ante.toString(),
     ]);
 }
 
@@ -484,8 +484,8 @@ export async function updateBuyInLimits(
 ): Promise<TransactionResult> {
     return submitTransaction(network, signer, 'TEXAS_HOLDEM', 'update_buy_in_limits', [
         tableAddress,
-        minBuyIn,
-        maxBuyIn,
+        minBuyIn.toString(),
+        maxBuyIn.toString(),
     ]);
 }
 
