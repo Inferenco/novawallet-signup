@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { NovaButton } from "@/components/ui";
 import { useToast } from "@/providers/ToastProvider";
 import { useWallet } from "@/providers/WalletProvider";
 import { hasConfiguredGameContracts } from "@/config/env";
@@ -20,10 +19,14 @@ import { useOwnerActions } from "../hooks/poker/useAdminActions";
 import { useTimeoutHandler } from "../hooks/poker/useTimeoutHandler";
 import { useAbortVote } from "../hooks/poker/useAbortVote";
 import { usePolling } from "../utils/poker/polling";
-import { GAME_PHASES, HAND_RANKS, PHASE_NAMES } from "../config/games";
+import {
+  CHIP_IMAGE_URL,
+  GAME_PHASES,
+  PHASE_NAMES,
+  PLAYER_STATUS
+} from "../config/games";
 import { parsePokerError } from "../utils/poker/errors";
 import { formatCard } from "../utils/poker/cards";
-import { fetchHandResults, type HandResultEvent } from "../services/poker/indexer";
 import { formatChips } from "../services/poker/chips";
 import { getProfiles, type UserProfile } from "../services/profiles";
 import { deriveThemeFromColor } from "../utils/theme";
@@ -44,6 +47,15 @@ function isEmptySeat(address: string | null | undefined): boolean {
   return !address || address === "0x0";
 }
 
+function formatTimer(seconds: number | null): string {
+  if (seconds === null || seconds <= 0) return "--:--";
+  const minutes = Math.floor(seconds / 60);
+  const remainder = seconds % 60;
+  return `${minutes}:${remainder.toString().padStart(2, "0")}`;
+}
+
+type OwnerEditorMode = "main" | "blinds" | "buyin" | "kick";
+
 export function PokerGameplayPage() {
   const { tableAddress } = useParams<{ tableAddress: string }>();
   const navigate = useNavigate();
@@ -52,6 +64,7 @@ export function PokerGameplayPage() {
   const network = useGamesNetwork();
   const { pushToast } = useToast();
   const address = wallet.account?.address?.toString() ?? "";
+  const contractsReady = hasConfiguredGameContracts();
 
   const {
     setActiveTable,
@@ -60,7 +73,6 @@ export function PokerGameplayPage() {
     tableState,
     seats,
     phase,
-    playersInHand,
     actionInfo,
     potSize,
     communityCards,
@@ -71,8 +83,6 @@ export function PokerGameplayPage() {
     mySeatIndex,
     commitDeadline,
     revealDeadline,
-    isLoading,
-    isRefreshing,
     error,
     reset
   } = usePokerTableStore();
@@ -86,8 +96,15 @@ export function PokerGameplayPage() {
   const [joinSeat, setJoinSeat] = useState<number | null>(null);
   const [joinBuyIn, setJoinBuyIn] = useState("200");
   const [raiseToAmount, setRaiseToAmount] = useState("");
-  const [latestResult, setLatestResult] = useState<HandResultEvent | null>(null);
-  const [showUtilityPanel, setShowUtilityPanel] = useState(true);
+  const [raiseRatio, setRaiseRatio] = useState(50);
+  const [showOwnerPanel, setShowOwnerPanel] = useState(false);
+  const [showAbortPanel, setShowAbortPanel] = useState(false);
+  const [ownerEditorMode, setOwnerEditorMode] = useState<OwnerEditorMode>("main");
+  const [newSmallBlind, setNewSmallBlind] = useState("");
+  const [newBigBlind, setNewBigBlind] = useState("");
+  const [newMinBuyIn, setNewMinBuyIn] = useState("");
+  const [newMaxBuyIn, setNewMaxBuyIn] = useState("");
+  const [nowMs, setNowMs] = useState(0);
   const [failedAvatarUrls, setFailedAvatarUrls] = useState<Set<string>>(new Set());
 
   const commitReveal = useCommitReveal({
@@ -155,36 +172,36 @@ export function PokerGameplayPage() {
     onFinalizeSuccess: () => {
       pushToast("info", "Abort vote finalized.");
       void onActionSuccess();
+      setShowAbortPanel(false);
     },
     onCancelSuccess: () => {
       void onActionSuccess();
+      setShowAbortPanel(false);
     }
   });
 
   useEffect(() => {
-    if (!tableAddress || !hasConfiguredGameContracts()) return;
+    if (!tableAddress || !contractsReady) return;
     setActiveTable(tableAddress, network);
     void refreshTableData(address || undefined);
 
     return () => {
       reset();
     };
-  }, [address, network, refreshTableData, reset, setActiveTable, tableAddress]);
+  }, [address, contractsReady, network, refreshTableData, reset, setActiveTable, tableAddress]);
 
   useEffect(() => {
-    if (!tableAddress) return;
+    const initializeId = window.setTimeout(() => {
+      setNowMs(Date.now());
+    }, 0);
     const id = window.setInterval(() => {
-      void fetchHandResults(network, tableAddress, 1)
-        .then((results) => {
-          setLatestResult(results[0] || null);
-        })
-        .catch(() => {
-          // ignore indexer lag/errors
-        });
-    }, 4000);
-
-    return () => window.clearInterval(id);
-  }, [network, tableAddress]);
+      setNowMs(Date.now());
+    }, 1000);
+    return () => {
+      window.clearTimeout(initializeId);
+      window.clearInterval(id);
+    };
+  }, []);
 
   useEffect(() => {
     if (seats.length === 0) return;
@@ -214,7 +231,7 @@ export function PokerGameplayPage() {
       interval: NORMAL_POLL,
       urgentInterval: URGENT_POLL,
       backgroundInterval: BACKGROUND_POLL,
-      enabled: Boolean(tableAddress && hasConfiguredGameContracts())
+      enabled: Boolean(tableAddress && contractsReady)
     }
   );
 
@@ -230,6 +247,10 @@ export function PokerGameplayPage() {
   }, [error, navigate, pushToast]);
 
   const requireSigner = useCallback(() => {
+    if (!contractsReady) {
+      pushToast("error", "Game contract addresses are not configured.");
+      return null;
+    }
     if (!wallet.connected || !signer) {
       pushToast("error", "Connect your wallet to play.");
       return null;
@@ -239,16 +260,19 @@ export function PokerGameplayPage() {
       return null;
     }
     return signer;
-  }, [pushToast, signer, wallet.connected, wallet.networkMismatch]);
+  }, [contractsReady, pushToast, signer, wallet.connected, wallet.networkMismatch]);
 
   const myCurrentBet =
     mySeatIndex !== null && seats[mySeatIndex] ? seats[mySeatIndex].currentBet : 0;
+  const myStack = mySeatIndex !== null && seats[mySeatIndex] ? seats[mySeatIndex].chipCount : 0;
   const callAmount = Math.max(0, maxCurrentBet - myCurrentBet);
   const canCheck = callAmount === 0;
   const inBettingRound = phase >= GAME_PHASES.PREFLOP && phase <= GAME_PHASES.RIVER;
   const activeSeatCount = seats.filter(
     (seat) => !isEmptySeat(seat.playerAddress) && !seat.isSittingOut && seat.chipCount > 0
   ).length;
+  const minRaiseTo = Math.max(minRaise, myCurrentBet + callAmount);
+  const maxRaiseTo = myCurrentBet + myStack;
 
   const runAction = useCallback(
     async (action: (activeSigner: NonNullable<typeof signer>) => Promise<boolean>) => {
@@ -260,6 +284,36 @@ export function PokerGameplayPage() {
       }
     },
     [onActionSuccess, requireSigner]
+  );
+
+  const calculateRaiseFromRatio = useCallback(
+    (ratio: number) => {
+      if (maxRaiseTo <= minRaiseTo) return minRaiseTo;
+      return Math.round(minRaiseTo + (ratio / 100) * (maxRaiseTo - minRaiseTo));
+    },
+    [maxRaiseTo, minRaiseTo]
+  );
+
+  const syncRatioFromRaise = useCallback(
+    (amount: number) => {
+      if (maxRaiseTo <= minRaiseTo) {
+        setRaiseRatio(100);
+        return;
+      }
+      const raw = ((amount - minRaiseTo) / (maxRaiseTo - minRaiseTo)) * 100;
+      const bounded = Math.max(0, Math.min(100, Math.round(raw)));
+      setRaiseRatio(bounded);
+    },
+    [maxRaiseTo, minRaiseTo]
+  );
+
+  const setRaisePreset = useCallback(
+    (ratio: number) => {
+      const bounded = Math.max(0, Math.min(100, ratio));
+      setRaiseRatio(bounded);
+      setRaiseToAmount(String(calculateRaiseFromRatio(bounded)));
+    },
+    [calculateRaiseFromRatio]
   );
 
   const handleJoin = useCallback(async () => {
@@ -274,17 +328,25 @@ export function PokerGameplayPage() {
       return;
     }
 
+    if (summary && (buyIn < summary.minBuyIn || buyIn > summary.maxBuyIn)) {
+      pushToast(
+        "error",
+        `Buy-in must be between ${formatChips(summary.minBuyIn)} and ${formatChips(summary.maxBuyIn)}.`
+      );
+      return;
+    }
+
     await runAction((activeSigner) =>
       tableActions.doJoin(activeSigner, joinSeat, BigInt(buyIn))
     );
-  }, [joinBuyIn, joinSeat, pushToast, runAction, tableActions]);
+  }, [joinBuyIn, joinSeat, pushToast, runAction, summary, tableActions]);
 
   const getProfileForAddress = useCallback(
     (seatAddress: string | null | undefined): UserProfile | null => {
       if (!seatAddress) return null;
-      const direct = playerProfiles.get(seatAddress);
-      if (direct) return direct;
-
+      if (playerProfiles.has(seatAddress)) {
+        return playerProfiles.get(seatAddress) ?? null;
+      }
       const lower = seatAddress.toLowerCase();
       for (const [key, value] of playerProfiles.entries()) {
         if (key.toLowerCase() === lower) {
@@ -370,9 +432,9 @@ export function PokerGameplayPage() {
   const statusMessage = useMemo(() => {
     if (summary?.isPaused) return "Table paused";
     if (needsCommit) return "Request your cards";
-    if (needsReveal) return "Reveal secret to accept cards";
+    if (needsReveal) return "Accept your cards";
     if (phase === GAME_PHASES.WAITING) {
-      return activeSeatCount >= 2 ? "Ready to start hand" : "Waiting for players";
+      return activeSeatCount >= 2 ? "Press Start Hand to begin" : "Waiting for players...";
     }
     if (phase === GAME_PHASES.SHOWDOWN) return "Showdown";
     if (isMyTurn) return "Your turn";
@@ -382,10 +444,50 @@ export function PokerGameplayPage() {
     return PHASE_NAMES[phase] || `Phase ${phase}`;
   }, [summary?.isPaused, needsCommit, needsReveal, phase, activeSeatCount, isMyTurn, actionInfo?.playerAddr]);
 
+  const timerSeconds = useMemo(() => {
+    if (needsCommit && commitDeadline > 0) {
+      return Math.max(0, Math.floor((commitDeadline * 1000 - nowMs) / 1000));
+    }
+    if (needsReveal && revealDeadline > 0) {
+      return Math.max(0, Math.floor((revealDeadline * 1000 - nowMs) / 1000));
+    }
+    return null;
+  }, [commitDeadline, needsCommit, needsReveal, nowMs, revealDeadline]);
+
+  const pendingActionCopy = useMemo(() => {
+    if (tableActions.pendingAction || bettingActions.pendingAction || ownerActions.pendingAction || abortVote.isPending) {
+      return "Action pending...";
+    }
+    if (isMyTurn) return "Action on you";
+    return "Waiting";
+  }, [
+    abortVote.isPending,
+    bettingActions.pendingAction,
+    isMyTurn,
+    ownerActions.pendingAction,
+    tableActions.pendingAction
+  ]);
+
+  const occupiedSeats = useMemo(
+    () =>
+      seats
+        .map((seat, seatIndex) => ({ seat, seatIndex }))
+        .filter(({ seat }) => !isEmptySeat(seat.playerAddress)),
+    [seats]
+  );
+
+  const myProfile = getProfileForAddress(address);
+  const myAvatarBlocked = Boolean(
+    myProfile?.avatarUrl && failedAvatarUrls.has(myProfile.avatarUrl)
+  );
+
+  const buyInBbMin = summary?.bigBlind ? Math.floor(summary.minBuyIn / summary.bigBlind) : 0;
+  const buyInBbMax = summary?.bigBlind ? Math.floor(summary.maxBuyIn / summary.bigBlind) : 0;
+
   if (!tableAddress) {
     return (
-      <div className="games-gameplay-shell">
-        <div className="games-gameplay-wrap">
+      <div className="games-gameplay-shell games-gameplay-shell-wallet">
+        <div className="games-gameplay-wrap games-gameplay-wrap-wallet">
           <p>Missing table address.</p>
           <Link className="nova-btn nova-btn-ghost" to="/games/poker">
             Back to lobby
@@ -395,111 +497,143 @@ export function PokerGameplayPage() {
     );
   }
 
-  const myProfile = getProfileForAddress(address);
-  const myAvatarBlocked = Boolean(
-    myProfile?.avatarUrl && failedAvatarUrls.has(myProfile.avatarUrl)
-  );
-
   return (
-    <div className="games-gameplay-shell" style={themeVars}>
-      <div className="games-gameplay-wrap games-gameplay-wrap-poker">
-        <header className="games-poker-header">
-          <div className="games-poker-header-left">
-            <Link className="nova-btn nova-btn-ghost nova-btn-sm" to="/games/poker">
-              Back
-            </Link>
+    <div className="games-gameplay-shell games-gameplay-shell-wallet" style={themeVars}>
+      <div className="games-gameplay-wrap games-gameplay-wrap-wallet">
+        <header className="games-wallet-header">
+          <Link className="games-wallet-icon-btn" to="/games/poker">
+            Back
+          </Link>
+
+          <div className="games-wallet-header-center">
+            <img
+              className="games-wallet-header-logo"
+              src="/assets/casino/game-icon.png"
+              alt="Nova"
+            />
             <div>
-              <p className="m-0 text-caption text-text-muted">Table</p>
-              <p className="m-0 text-body text-text-primary">
-                {summary?.name || shortAddress(tableAddress)}
+              <p className="games-wallet-table-name">{summary?.name || "Nova Poker"}</p>
+              <p className="games-wallet-table-meta">
+                Blinds {summary?.smallBlind ?? 0}/{summary?.bigBlind ?? 0}
+                {" \u2022 "}
+                Buy-In {buyInBbMin}-{buyInBbMax} BB
               </p>
             </div>
           </div>
 
-          <div className="games-poker-header-right">
-            <span className={`games-poker-phase-pill ${isMyTurn ? "active" : ""}`}>
-              {PHASE_NAMES[phase] || `Phase ${phase}`}
-            </span>
-            <NovaButton variant="ghost" size="sm" onClick={() => poll()}>
-              Refresh
-            </NovaButton>
-            <NovaButton
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowUtilityPanel((current) => !current)}
+          <div className="games-wallet-header-right">
+            <button
+              type="button"
+              className="games-wallet-icon-btn"
+              onClick={() => poll()}
             >
-              {showUtilityPanel ? "Hide Panel" : "Show Panel"}
-            </NovaButton>
+              Refresh
+            </button>
+            <button
+              type="button"
+              className="games-wallet-icon-btn games-wallet-icon-only"
+              onClick={() => {
+                if (isAdmin) {
+                  setShowOwnerPanel((current) => {
+                    const next = !current;
+                    if (next && summary) {
+                      setNewSmallBlind(String(summary.smallBlind));
+                      setNewBigBlind(String(summary.bigBlind));
+                      setNewMinBuyIn(String(summary.minBuyIn));
+                      setNewMaxBuyIn(String(summary.maxBuyIn));
+                      setOwnerEditorMode("main");
+                    }
+                    return next;
+                  });
+                } else {
+                  setShowAbortPanel((current) => !current);
+                }
+              }}
+              aria-label={isAdmin ? "Admin Controls" : "Table Actions"}
+            >
+              {isAdmin ? "⚙" : "⋮"}
+            </button>
           </div>
         </header>
 
-        <div className={`games-poker-status ${isMyTurn ? "active" : ""}`}>
-          <span>{statusMessage}</span>
-          <div className="games-poker-status-actions">
+        <div className={`games-wallet-status-bar ${isMyTurn ? "active" : ""}`}>
+          <p className="m-0">• {statusMessage}</p>
+          <div className="games-wallet-status-actions">
             {needsCommit && (
-              <NovaButton
-                size="sm"
+              <button
+                type="button"
+                className="games-wallet-mini-btn games-wallet-mini-btn-accent"
                 onClick={() =>
                   void runAction(async (activeSigner) => commitReveal.commit(activeSigner))
                 }
               >
-                Commit
-              </NovaButton>
+                Request
+              </button>
             )}
             {needsReveal && (
-              <NovaButton
-                size="sm"
+              <button
+                type="button"
+                className="games-wallet-mini-btn games-wallet-mini-btn-accent"
                 onClick={() =>
                   void runAction(async (activeSigner) => commitReveal.reveal(activeSigner))
                 }
               >
-                Reveal
-              </NovaButton>
+                Accept
+              </button>
             )}
-            <NovaButton
-              size="sm"
-              variant="danger"
+            <button
+              type="button"
+              className="games-wallet-mini-btn games-wallet-mini-btn-danger"
               disabled={!timeoutHandler.canCallTimeout}
               onClick={() => void runAction((activeSigner) => timeoutHandler.callTimeout(activeSigner))}
             >
               Timeout
-            </NovaButton>
+            </button>
           </div>
         </div>
 
-        {!hasConfiguredGameContracts() && (
-          <div className="rounded-nova-standard border border-status-warning-border bg-status-warning-bg p-nova-md text-status-warning">
-            Game contracts are not configured for this dapp environment.
+        {!contractsReady && (
+          <div className="games-wallet-config-warning">
+            Configure `VITE_GAME_CONTRACT_ADDRESS` and `VITE_GAMES_WALLET_CONTRACT_ADDRESS` to enable live transactions.
           </div>
         )}
 
-        <section className="games-poker-stage">
-          <div className="games-poker-table-wrap">
-            <div className="games-poker-table-rim">
-              <div className="games-poker-table-felt">
-                <div className="games-poker-pot-pill">
-                  <span className="label">Pot</span>
-                  <span className="value">{formatChips(potSize)}</span>
-                </div>
+        <section className="games-wallet-table-section">
+          <div className="games-wallet-table-canvas">
+            <div className="games-wallet-table-outer">
+              <img
+                className="games-wallet-table-wood-texture"
+                src="/assets/casino/wood-texture.png"
+                alt=""
+                aria-hidden
+              />
+              <div className="games-wallet-table-felt">
+                <img
+                  className="games-wallet-table-felt-texture"
+                  src="/assets/casino/felt-texture.png"
+                  alt=""
+                  aria-hidden
+                />
 
-                <div className="games-poker-board-row">
+                {potSize > 0 && (
+                  <div className="games-wallet-pot-pill">
+                    <span className="label">POT</span>
+                    <span className="value">{formatChips(potSize)}</span>
+                  </div>
+                )}
+
+                <div className="games-wallet-board-row">
                   {[0, 1, 2, 3, 4].map((idx) => {
                     const card = communityCards[idx];
                     return (
                       <span
                         key={idx}
-                        className={`games-playing-card ${card === undefined ? "face-down" : ""}`}
+                        className={`games-wallet-card ${card === undefined ? "face-down" : ""}`}
                       >
-                        {card === undefined ? "" : formatCard(card)}
+                        {card === undefined ? "♠" : formatCard(card)}
                       </span>
                     );
                   })}
-                </div>
-
-                <div className="games-poker-meta-row">
-                  <span>Hand #{tableState?.handNumber || 0}</span>
-                  <span>Players in hand: {playersInHand.length}</span>
-                  <span>{isLoading || isRefreshing ? "Syncing..." : "Synced"}</span>
                 </div>
               </div>
             </div>
@@ -507,22 +641,24 @@ export function PokerGameplayPage() {
             {rotatedSeatData.map(({ actualSeatIndex, displayPosition, seat, profile, isActive }) => {
               const empty = isEmptySeat(seat.playerAddress);
               const canJoinThisSeat = empty && mySeatIndex === null;
-              const isFolded = seat.status === 2;
+              const isFolded = seat.status === PLAYER_STATUS.FOLDED;
+              const isAllIn = seat.status === PLAYER_STATUS.ALL_IN;
               const seatName = empty
-                ? "Empty Seat"
+                ? "Tap to Join"
                 : profile?.nickname || shortAddress(seat.playerAddress) || `Seat ${actualSeatIndex + 1}`;
               const hasBrokenAvatar = Boolean(
                 profile?.avatarUrl && failedAvatarUrls.has(profile.avatarUrl)
               );
               const shouldShowBet = !empty && seat.currentBet > 0 && phase !== GAME_PHASES.WAITING;
+              const isDealer = tableState?.dealerSeat === actualSeatIndex;
 
               return (
                 <button
                   key={actualSeatIndex}
                   type="button"
-                  className={`games-poker-seat games-poker-seat-${displayPosition} ${isActive ? "active" : ""} ${
-                    mySeatIndex === actualSeatIndex ? "hero" : ""
-                  } ${canJoinThisSeat ? "joinable" : ""}`}
+                  className={`games-wallet-seat games-wallet-seat-${displayPosition} ${
+                    isActive ? "active" : ""
+                  } ${mySeatIndex === actualSeatIndex ? "hero" : ""} ${canJoinThisSeat ? "joinable" : ""}`}
                   onClick={() => {
                     if (canJoinThisSeat) {
                       setJoinSeat(actualSeatIndex);
@@ -530,8 +666,7 @@ export function PokerGameplayPage() {
                   }}
                   disabled={!canJoinThisSeat}
                 >
-                  <span className="seat-index">Seat {actualSeatIndex + 1}</span>
-                  <span className="avatar-ring">
+                  <span className={`games-wallet-seat-circle ${empty ? "empty" : ""}`}>
                     {profile?.avatarUrl && !hasBrokenAvatar ? (
                       <img
                         src={profile.avatarUrl}
@@ -544,264 +679,555 @@ export function PokerGameplayPage() {
                           });
                         }}
                       />
+                    ) : empty ? (
+                      <span className="games-wallet-seat-empty-copy">TAP TO<br />JOIN</span>
                     ) : (
-                      <span>{empty ? "+" : seatName.slice(0, 1).toUpperCase()}</span>
+                      <span>{seatName.slice(0, 1).toUpperCase()}</span>
                     )}
+                    {isDealer && !empty && <span className="games-wallet-dealer-chip">D</span>}
                   </span>
-                  <span className={`seat-name ${isFolded ? "muted" : ""}`}>{seatName}</span>
-                  <span className={`seat-stack ${isFolded ? "muted" : ""}`}>
-                    {formatChips(seat.chipCount)}
-                  </span>
-                  {shouldShowBet && <span className="seat-bet">Bet {formatChips(seat.currentBet)}</span>}
-                  {canJoinThisSeat && <span className="join-copy">Tap to join</span>}
+
+                  {!empty && (
+                    <>
+                      <span className={`games-wallet-seat-name ${isFolded ? "muted" : ""}`}>{seatName}</span>
+                      <span className={`games-wallet-seat-stack ${isFolded ? "muted" : ""}`}>
+                        <img src={CHIP_IMAGE_URL} alt="" aria-hidden />
+                        {formatChips(seat.chipCount)}
+                      </span>
+                      {isAllIn && <span className="games-wallet-seat-allin">ALL-IN</span>}
+                    </>
+                  )}
+
+                  {shouldShowBet && (
+                    <span className="games-wallet-seat-bet">
+                      <img src={CHIP_IMAGE_URL} alt="" aria-hidden />
+                      {formatChips(seat.currentBet)}
+                    </span>
+                  )}
                 </button>
               );
             })}
           </div>
         </section>
 
-        {showUtilityPanel && (
-          <section className="games-poker-utility-grid">
-            <div className="games-poker-panel">
-              <p className="panel-title">Join / Seat</p>
-              <p className="panel-copy">
-                {mySeatIndex === null
-                  ? `Selected seat: ${joinSeat !== null ? joinSeat + 1 : "none"}`
-                  : `You are seated at ${mySeatIndex + 1}`}
-              </p>
-              <input
-                className="games-inline-input"
-                value={joinBuyIn}
-                onChange={(event) => setJoinBuyIn(event.target.value)}
-                placeholder="Join buy-in"
-              />
-              <div className="games-poker-inline-actions">
-                <NovaButton
-                  size="sm"
-                  disabled={joinSeat === null || mySeatIndex !== null}
-                  onClick={() => void handleJoin()}
-                >
-                  Join Selected Seat
-                </NovaButton>
-                <NovaButton
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => void runAction((activeSigner) => tableActions.doLeave(activeSigner))}
-                >
-                  Leave
-                </NovaButton>
-                <NovaButton
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => void runAction((activeSigner) => tableActions.doSitOut(activeSigner))}
-                >
-                  Sit Out
-                </NovaButton>
-                <NovaButton
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => void runAction((activeSigner) => tableActions.doSitIn(activeSigner))}
-                >
-                  Sit In
-                </NovaButton>
-              </div>
-            </div>
+        <div className="games-wallet-info-row">
+          <span className={`games-wallet-timer ${timerSeconds !== null && timerSeconds <= 10 ? "urgent" : ""}`}>
+            {formatTimer(timerSeconds)}
+          </span>
+          <span>{PHASE_NAMES[phase] || "Waiting"}</span>
+          <span>Hand #{tableState?.handNumber || 0}</span>
+        </div>
 
-            <div className="games-poker-panel">
-              <p className="panel-title">Commit / Reveal</p>
-              <p className="panel-copy">
-                Commit deadline: {commitDeadline > 0 ? new Date(commitDeadline * 1000).toLocaleTimeString() : "--"}
-              </p>
-              <p className="panel-copy">
-                Reveal deadline: {revealDeadline > 0 ? new Date(revealDeadline * 1000).toLocaleTimeString() : "--"}
-              </p>
-              <p className="panel-copy">
-                Status: {commitReveal.status}
-                {commitReveal.error ? ` • ${commitReveal.error}` : ""}
-              </p>
-            </div>
-
-            <div className="games-poker-panel">
-              <p className="panel-title">Abort Vote</p>
-              <p className="panel-copy">
-                {abortVote.abortInProgress
-                  ? `In progress • ${abortVote.approvalCount}/${abortVote.seatedCount} approvals`
-                  : "No active abort vote"}
-              </p>
-              <div className="games-poker-inline-actions">
-                <NovaButton size="sm" variant="ghost" onClick={() => void runAction((s) => abortVote.request(s))}>
-                  Request
-                </NovaButton>
-                <NovaButton size="sm" variant="ghost" onClick={() => void runAction((s) => abortVote.vote(s, true))}>
-                  Approve
-                </NovaButton>
-                <NovaButton size="sm" variant="ghost" onClick={() => void runAction((s) => abortVote.vote(s, false))}>
-                  Veto
-                </NovaButton>
-                <NovaButton size="sm" disabled={!abortVote.canFinalize} onClick={() => void runAction((s) => abortVote.finalize(s))}>
-                  Finalize
-                </NovaButton>
-                <NovaButton size="sm" variant="ghost" onClick={() => void runAction((s) => abortVote.cancel(s))}>
-                  Cancel
-                </NovaButton>
-              </div>
-            </div>
-
-            {isAdmin && (
-              <div className="games-poker-panel">
-                <p className="panel-title">Owner Controls</p>
-                <div className="games-poker-inline-actions">
-                  <NovaButton size="sm" disabled={!canStartHand} onClick={() => void runAction((s) => tableActions.doStartHand(s))}>
-                    Start Hand
-                  </NovaButton>
-                  <NovaButton size="sm" variant="ghost" onClick={() => void runAction((s) => ownerActions.doPause(s))}>
-                    Pause
-                  </NovaButton>
-                  <NovaButton size="sm" variant="ghost" onClick={() => void runAction((s) => ownerActions.doResume(s))}>
-                    Resume
-                  </NovaButton>
-                </div>
-              </div>
-            )}
-
-            {latestResult && (
-              <div className="games-poker-panel">
-                <p className="panel-title">Latest Result</p>
-                <p className="panel-copy">Hand #{latestResult.handNumber} • Pot {formatChips(latestResult.totalPot)}</p>
-                <p className="panel-copy">
-                  Winners: {latestResult.winnerPlayers.length}
-                  {latestResult.showdownHandTypes[0] !== undefined
-                    ? ` • ${HAND_RANKS[latestResult.showdownHandTypes[0]] || "Showdown"}`
-                    : ""}
-                </p>
-              </div>
-            )}
-          </section>
+        {phase === GAME_PHASES.WAITING && mySeatIndex !== null && (
+          <div className="games-wallet-waiting-controls">
+            <button
+              type="button"
+              className="games-wallet-start-btn"
+              disabled={!canStartHand}
+              onClick={() => void runAction((activeSigner) => tableActions.doStartHand(activeSigner))}
+            >
+              Start Hand
+            </button>
+            <button
+              type="button"
+              className="games-wallet-leave-btn"
+              onClick={() => void runAction((activeSigner) => tableActions.doLeave(activeSigner))}
+            >
+              Leave
+            </button>
+          </div>
         )}
 
-        <section className="games-poker-hero-bar">
-          <div className="games-poker-hero-top">
-            <div className="games-poker-hero-summary">
-              <span className={`hero-avatar ${isMyTurn ? "active" : ""}`}>
-                {myProfile?.avatarUrl && !myAvatarBlocked ? (
-                  <img
-                    src={myProfile.avatarUrl}
-                    alt={myProfile.nickname || "Hero"}
-                    onError={() => {
-                      setFailedAvatarUrls((current) => {
-                        const next = new Set(current);
-                        next.add(myProfile.avatarUrl as string);
-                        return next;
-                      });
-                    }}
-                  />
-                ) : (
-                  <span>{(myProfile?.nickname || "H").slice(0, 1).toUpperCase()}</span>
-                )}
-              </span>
-              <div>
-                <p className="m-0 text-caption text-text-muted">My Stack</p>
-                <p className="m-0 text-body text-text-primary">
-                  {formatChips(mySeatIndex !== null && seats[mySeatIndex] ? seats[mySeatIndex].chipCount : 0)}
-                </p>
+        {mySeatIndex === null && (
+          <div className="games-wallet-join-bar">
+            <div className="games-wallet-join-seat-label">
+              Selected seat: {joinSeat !== null ? joinSeat + 1 : "none"}
+            </div>
+            <input
+              className="games-wallet-text-input"
+              value={joinBuyIn}
+              onChange={(event) => setJoinBuyIn(event.target.value)}
+              placeholder={summary ? `${summary.minBuyIn}` : "Buy-in"}
+            />
+            <button
+              type="button"
+              className="games-wallet-join-btn"
+              disabled={joinSeat === null}
+              onClick={() => void handleJoin()}
+            >
+              Join Selected Seat
+            </button>
+          </div>
+        )}
+
+        {mySeatIndex !== null && (
+          <section className="games-wallet-hero-bar">
+            <div className="games-wallet-hero-top">
+              <div className="games-wallet-hero-summary">
+                <span className={`games-wallet-hero-avatar ${isMyTurn ? "active" : ""}`}>
+                  {myProfile?.avatarUrl && !myAvatarBlocked ? (
+                    <img
+                      src={myProfile.avatarUrl}
+                      alt={myProfile.nickname || "Hero"}
+                      onError={() => {
+                        setFailedAvatarUrls((current) => {
+                          const next = new Set(current);
+                          next.add(myProfile.avatarUrl as string);
+                          return next;
+                        });
+                      }}
+                    />
+                  ) : (
+                    <span>{(myProfile?.nickname || "H").slice(0, 1).toUpperCase()}</span>
+                  )}
+                </span>
+                <div>
+                  <p className="m-0 games-wallet-hero-label">MY STACK</p>
+                  <p className="m-0 games-wallet-hero-value">{formatChips(myStack)}</p>
+                </div>
+              </div>
+
+              <div className="games-wallet-hero-cards">
+                {[0, 1].map((idx) => {
+                  const card = myHoleCards[idx];
+                  const hidden = card === undefined || !myCardsDecrypted;
+                  return (
+                    <span key={idx} className={`games-wallet-card small ${hidden ? "face-down" : ""}`}>
+                      {hidden ? "♠" : formatCard(card)}
+                    </span>
+                  );
+                })}
+              </div>
+
+              <div className="games-wallet-raise-box">
+                <label htmlFor="raise-input">RAISE TO</label>
+                <input
+                  id="raise-input"
+                  className="games-wallet-text-input"
+                  value={raiseToAmount}
+                  onChange={(event) => {
+                    setRaiseToAmount(event.target.value);
+                    const parsed = Number.parseInt(event.target.value, 10);
+                    if (Number.isFinite(parsed)) {
+                      syncRatioFromRaise(parsed);
+                    }
+                  }}
+                  placeholder={`${minRaiseTo}`}
+                />
               </div>
             </div>
 
-            <div className="games-poker-hero-cards">
-              {[0, 1].map((idx) => {
-                const card = myHoleCards[idx];
-                const hidden = card === undefined || !myCardsDecrypted;
-                return (
-                  <span
-                    key={idx}
-                    className={`games-playing-card ${hidden ? "face-down" : ""}`}
-                  >
-                    {hidden ? "" : formatCard(card)}
-                  </span>
-                );
-              })}
-            </div>
-
-            <div className="games-poker-raise-input">
-              <label htmlFor="raise-input">Raise To</label>
+            <div className="games-wallet-raise-controls">
+              <div className="games-wallet-preset-row">
+                <button
+                  type="button"
+                  className="games-wallet-preset-btn"
+                  onClick={() => setRaisePreset(0)}
+                  disabled={!inBettingRound || !isMyTurn}
+                >
+                  MIN
+                </button>
+                <button
+                  type="button"
+                  className="games-wallet-preset-btn"
+                  onClick={() => setRaisePreset(50)}
+                  disabled={!inBettingRound || !isMyTurn}
+                >
+                  50%
+                </button>
+                <button
+                  type="button"
+                  className="games-wallet-preset-btn"
+                  onClick={() => setRaisePreset(100)}
+                  disabled={!inBettingRound || !isMyTurn}
+                >
+                  MAX
+                </button>
+              </div>
               <input
-                id="raise-input"
-                className="games-inline-input"
-                value={raiseToAmount}
-                onChange={(event) => setRaiseToAmount(event.target.value)}
-                placeholder={`${Math.max(minRaise, callAmount + myCurrentBet)}`}
+                type="range"
+                min={0}
+                max={100}
+                value={raiseRatio}
+                className="games-wallet-raise-slider"
+                disabled={!inBettingRound || !isMyTurn || maxRaiseTo <= minRaiseTo}
+                onChange={(event) => {
+                  const ratio = Number.parseInt(event.target.value, 10);
+                  setRaiseRatio(ratio);
+                  setRaiseToAmount(String(calculateRaiseFromRatio(ratio)));
+                }}
               />
             </div>
-          </div>
 
-          <div className="games-poker-hero-actions">
-            <NovaButton
-              size="sm"
-              variant="ghost"
-              disabled={!isMyTurn || !inBettingRound}
-              onClick={() => void runAction((s) => bettingActions.doFold(s))}
-            >
-              Fold
-            </NovaButton>
-            <NovaButton
-              size="sm"
-              variant="ghost"
-              disabled={!isMyTurn || !inBettingRound || !canCheck}
-              onClick={() => void runAction((s) => bettingActions.doCheck(s))}
-            >
-              Check
-            </NovaButton>
-            <NovaButton
-              size="sm"
-              variant="accent"
-              disabled={!isMyTurn || !inBettingRound || canCheck}
-              onClick={() => void runAction((s) => bettingActions.doCall(s))}
-            >
-              Call {formatChips(callAmount)}
-            </NovaButton>
-            <NovaButton
-              size="sm"
-              disabled={!isMyTurn || !inBettingRound}
-              onClick={() => {
-                const parsed = Number.parseInt(raiseToAmount, 10);
-                if (!Number.isFinite(parsed) || parsed <= 0) {
-                  pushToast("error", "Enter a valid raise amount.");
-                  return;
-                }
-                void runAction((s) => bettingActions.doRaise(s, BigInt(parsed)));
-              }}
-            >
-              Raise
-            </NovaButton>
-            <NovaButton
-              size="sm"
-              variant="danger"
-              disabled={!isMyTurn || !inBettingRound}
-              onClick={() => void runAction((s) => bettingActions.doAllIn(s))}
-            >
-              All-in
-            </NovaButton>
-          </div>
+            <div className="games-wallet-action-row">
+              <button
+                type="button"
+                className="games-wallet-action-btn fold"
+                disabled={!isMyTurn || !inBettingRound}
+                onClick={() => void runAction((activeSigner) => bettingActions.doFold(activeSigner))}
+              >
+                Fold
+              </button>
+              <button
+                type="button"
+                className="games-wallet-action-btn check"
+                disabled={!isMyTurn || !inBettingRound || !canCheck}
+                onClick={() => void runAction((activeSigner) => bettingActions.doCheck(activeSigner))}
+              >
+                Check
+              </button>
+              <button
+                type="button"
+                className="games-wallet-action-btn call"
+                disabled={!isMyTurn || !inBettingRound || canCheck}
+                onClick={() => void runAction((activeSigner) => bettingActions.doCall(activeSigner))}
+              >
+                Call {formatChips(callAmount)}
+              </button>
+              <button
+                type="button"
+                className="games-wallet-action-btn raise"
+                disabled={!isMyTurn || !inBettingRound}
+                onClick={() => {
+                  const parsed = Number.parseInt(raiseToAmount, 10);
+                  if (!Number.isFinite(parsed) || parsed <= 0) {
+                    pushToast("error", "Enter a valid raise amount.");
+                    return;
+                  }
+                  if (parsed < minRaiseTo) {
+                    pushToast("error", `Raise must be at least ${formatChips(minRaiseTo)}.`);
+                    return;
+                  }
+                  void runAction((activeSigner) => bettingActions.doRaise(activeSigner, BigInt(parsed)));
+                }}
+              >
+                Raise
+              </button>
+            </div>
 
-          <div className="games-poker-hero-subactions">
-            <NovaButton
-              size="sm"
-              variant="ghost"
-              disabled={!canStraddle}
-              onClick={() => void runAction((s) => bettingActions.doStraddle(s))}
-            >
-              Straddle
-            </NovaButton>
-            <span className="text-caption text-text-muted">
-              {tableActions.pendingAction || bettingActions.pendingAction || ownerActions.pendingAction
-                ? "Submitting action..."
-                : isMyTurn
-                  ? "Action on you"
-                  : "Waiting"}
-            </span>
-          </div>
-        </section>
+            <div className="games-wallet-subaction-row">
+              <button
+                type="button"
+                className="games-wallet-link-btn danger"
+                disabled={!isMyTurn || !inBettingRound}
+                onClick={() => void runAction((activeSigner) => bettingActions.doAllIn(activeSigner))}
+              >
+                ALL-IN ({formatChips(myStack)})
+              </button>
+              <button
+                type="button"
+                className="games-wallet-link-btn"
+                disabled={!canStraddle}
+                onClick={() => void runAction((activeSigner) => bettingActions.doStraddle(activeSigner))}
+              >
+                Straddle
+              </button>
+              <button
+                type="button"
+                className="games-wallet-link-btn"
+                onClick={() => void runAction((activeSigner) => tableActions.doSitOut(activeSigner))}
+              >
+                Sit Out
+              </button>
+              <button
+                type="button"
+                className="games-wallet-link-btn"
+                onClick={() => void runAction((activeSigner) => tableActions.doSitIn(activeSigner))}
+              >
+                Sit In
+              </button>
+              <button
+                type="button"
+                className="games-wallet-link-btn"
+                onClick={() => setShowAbortPanel(true)}
+              >
+                Abort
+              </button>
+              <span className="games-wallet-pending-copy">{pendingActionCopy}</span>
+            </div>
+          </section>
+        )}
       </div>
+
+      {showAbortPanel && (
+        <div className="games-modal-backdrop">
+          <div className="games-wallet-modal">
+            <div className="games-wallet-modal-header">
+              <p className="m-0 games-wallet-modal-title">Abort Vote</p>
+              <button
+                type="button"
+                className="games-wallet-icon-btn games-wallet-icon-only"
+                onClick={() => setShowAbortPanel(false)}
+              >
+                ✕
+              </button>
+            </div>
+            <p className="m-0 games-wallet-modal-copy">
+              {abortVote.abortInProgress
+                ? `In progress • ${abortVote.approvalCount}/${abortVote.seatedCount} approvals`
+                : "No active abort vote"}
+            </p>
+            {abortVote.abortDeadline > 0 && (
+              <p className="m-0 games-wallet-modal-copy">
+                Deadline: {new Date(abortVote.abortDeadline * 1000).toLocaleTimeString()}
+              </p>
+            )}
+            <div className="games-wallet-modal-actions">
+              <button
+                type="button"
+                className="games-wallet-mini-btn"
+                onClick={() => void runAction((activeSigner) => abortVote.request(activeSigner))}
+                disabled={abortVote.abortInProgress}
+              >
+                Request
+              </button>
+              <button
+                type="button"
+                className="games-wallet-mini-btn"
+                onClick={() => void runAction((activeSigner) => abortVote.vote(activeSigner, true))}
+                disabled={!abortVote.abortInProgress}
+              >
+                Approve
+              </button>
+              <button
+                type="button"
+                className="games-wallet-mini-btn"
+                onClick={() => void runAction((activeSigner) => abortVote.vote(activeSigner, false))}
+                disabled={!abortVote.abortInProgress}
+              >
+                Veto
+              </button>
+              <button
+                type="button"
+                className="games-wallet-mini-btn games-wallet-mini-btn-accent"
+                disabled={!abortVote.canFinalize}
+                onClick={() => void runAction((activeSigner) => abortVote.finalize(activeSigner))}
+              >
+                Finalize
+              </button>
+              <button
+                type="button"
+                className="games-wallet-mini-btn games-wallet-mini-btn-danger"
+                onClick={() => void runAction((activeSigner) => abortVote.cancel(activeSigner))}
+                disabled={!abortVote.abortInProgress}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showOwnerPanel && isAdmin && summary && (
+        <div className="games-modal-backdrop">
+          <div className="games-wallet-modal games-wallet-owner-modal">
+            <div className="games-wallet-modal-header">
+              <p className="m-0 games-wallet-modal-title">Admin Controls</p>
+              <button
+                type="button"
+                className="games-wallet-icon-btn games-wallet-icon-only"
+                onClick={() => setShowOwnerPanel(false)}
+              >
+                ✕
+              </button>
+            </div>
+
+            {ownerEditorMode === "main" && (
+              <>
+                <div className="games-wallet-owner-status-row">
+                  <span>Table Status</span>
+                  <span className={`games-wallet-status-pill ${summary.isPaused ? "paused" : "active"}`}>
+                    {summary.isPaused ? "PAUSED" : "ACTIVE"}
+                  </span>
+                </div>
+
+                <div className="games-wallet-owner-pause-row">
+                  <div>
+                    <p className="m-0 games-wallet-modal-title-small">Pause Table</p>
+                    <p className="m-0 games-wallet-modal-copy">Prevent new hands from starting</p>
+                  </div>
+                  <label className="games-wallet-switch">
+                    <input
+                      type="checkbox"
+                      checked={summary.isPaused}
+                      onChange={() => {
+                        void runAction((activeSigner) =>
+                          summary.isPaused
+                            ? ownerActions.doResume(activeSigner)
+                            : ownerActions.doPause(activeSigner)
+                        );
+                      }}
+                    />
+                    <span />
+                  </label>
+                </div>
+
+                <div className="games-wallet-owner-grid">
+                  <button type="button" className="games-wallet-owner-action" onClick={() => setOwnerEditorMode("blinds")}>
+                    Blinds
+                  </button>
+                  <button type="button" className="games-wallet-owner-action" onClick={() => setOwnerEditorMode("buyin")}>
+                    Buy-In
+                  </button>
+                  <button
+                    type="button"
+                    className="games-wallet-owner-action"
+                    onClick={() => setOwnerEditorMode("kick")}
+                    disabled={occupiedSeats.length === 0}
+                  >
+                    Kick
+                  </button>
+                  <button
+                    type="button"
+                    className="games-wallet-owner-action danger"
+                    onClick={() => {
+                      if (summary.hasActiveGame) {
+                        pushToast("error", "Cannot close table during an active hand.");
+                        return;
+                      }
+                      void runAction((activeSigner) => ownerActions.doCloseTable(activeSigner));
+                    }}
+                    disabled={summary.hasActiveGame}
+                  >
+                    Close
+                  </button>
+                </div>
+              </>
+            )}
+
+            {ownerEditorMode === "blinds" && (
+              <>
+                <p className="m-0 games-wallet-modal-title-small">Update Blinds</p>
+                <div className="games-wallet-form-grid">
+                  <label>
+                    Small Blind
+                    <input
+                      className="games-wallet-text-input"
+                      value={newSmallBlind}
+                      onChange={(event) => setNewSmallBlind(event.target.value)}
+                    />
+                  </label>
+                  <label>
+                    Big Blind
+                    <input
+                      className="games-wallet-text-input"
+                      value={newBigBlind}
+                      onChange={(event) => setNewBigBlind(event.target.value)}
+                    />
+                  </label>
+                </div>
+                <div className="games-wallet-modal-actions">
+                  <button type="button" className="games-wallet-mini-btn" onClick={() => setOwnerEditorMode("main")}>
+                    Back
+                  </button>
+                  <button
+                    type="button"
+                    className="games-wallet-mini-btn games-wallet-mini-btn-accent"
+                    onClick={() => {
+                      const sb = Number.parseInt(newSmallBlind, 10);
+                      const bb = Number.parseInt(newBigBlind, 10);
+                      if (!Number.isFinite(sb) || !Number.isFinite(bb) || sb <= 0 || bb <= 0) {
+                        pushToast("error", "Enter valid blind values.");
+                        return;
+                      }
+                      if (bb !== sb * 2) {
+                        pushToast("error", "Big blind must be exactly 2x small blind.");
+                        return;
+                      }
+                      void runAction((activeSigner) =>
+                        ownerActions.doUpdateBlinds(activeSigner, BigInt(sb), BigInt(bb))
+                      );
+                      setOwnerEditorMode("main");
+                    }}
+                  >
+                    Update
+                  </button>
+                </div>
+              </>
+            )}
+
+            {ownerEditorMode === "buyin" && (
+              <>
+                <p className="m-0 games-wallet-modal-title-small">Update Buy-In</p>
+                <div className="games-wallet-form-grid">
+                  <label>
+                    Min Buy-In
+                    <input
+                      className="games-wallet-text-input"
+                      value={newMinBuyIn}
+                      onChange={(event) => setNewMinBuyIn(event.target.value)}
+                    />
+                  </label>
+                  <label>
+                    Max Buy-In
+                    <input
+                      className="games-wallet-text-input"
+                      value={newMaxBuyIn}
+                      onChange={(event) => setNewMaxBuyIn(event.target.value)}
+                    />
+                  </label>
+                </div>
+                <div className="games-wallet-modal-actions">
+                  <button type="button" className="games-wallet-mini-btn" onClick={() => setOwnerEditorMode("main")}>
+                    Back
+                  </button>
+                  <button
+                    type="button"
+                    className="games-wallet-mini-btn games-wallet-mini-btn-accent"
+                    onClick={() => {
+                      const min = Number.parseInt(newMinBuyIn, 10);
+                      const max = Number.parseInt(newMaxBuyIn, 10);
+                      if (!Number.isFinite(min) || !Number.isFinite(max) || min <= 0 || max <= 0) {
+                        pushToast("error", "Enter valid buy-in values.");
+                        return;
+                      }
+                      if (max < min) {
+                        pushToast("error", "Max buy-in must be greater than or equal to min buy-in.");
+                        return;
+                      }
+                      void runAction((activeSigner) =>
+                        ownerActions.doUpdateBuyInLimits(activeSigner, BigInt(min), BigInt(max))
+                      );
+                      setOwnerEditorMode("main");
+                    }}
+                  >
+                    Update
+                  </button>
+                </div>
+              </>
+            )}
+
+            {ownerEditorMode === "kick" && (
+              <>
+                <p className="m-0 games-wallet-modal-title-small">Kick Player</p>
+                <div className="games-wallet-kick-list">
+                  {occupiedSeats.map(({ seat, seatIndex }) => (
+                    <button
+                      key={seat.playerAddress || seatIndex}
+                      type="button"
+                      className="games-wallet-kick-item"
+                      onClick={() => {
+                        void runAction((activeSigner) => ownerActions.doKickPlayer(activeSigner, seatIndex));
+                        setOwnerEditorMode("main");
+                      }}
+                    >
+                      <span>
+                        Seat {seatIndex + 1} {shortAddress(seat.playerAddress)}
+                      </span>
+                      <span>{formatChips(seat.chipCount)}</span>
+                    </button>
+                  ))}
+                </div>
+                <div className="games-wallet-modal-actions">
+                  <button type="button" className="games-wallet-mini-btn" onClick={() => setOwnerEditorMode("main")}>
+                    Back
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
