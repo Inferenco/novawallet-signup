@@ -1,10 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-import { GlassCard, NovaButton } from "@/components/ui";
-import { useToast } from "@/providers/ToastProvider";
-import { formatCedraFromOctas } from "@/lib/format";
-import { useWallet } from "@/providers/WalletProvider";
+import { Link, useNavigate } from "react-router-dom";
+import { WalletButton } from "@/components/wallet/WalletButton";
 import { hasConfiguredGameContracts } from "@/config/env";
+import { formatCedraFromOctas } from "@/lib/format";
+import { useToast } from "@/providers/ToastProvider";
+import { useWallet } from "@/providers/WalletProvider";
+import { GamesTopBar } from "../components/GamesTopBar";
+import { CasinoDisclaimerModal } from "../components/casino/CasinoDisclaimerModal";
+import { FreeChipsCard } from "../components/casino/FreeChipsCard";
+import { MultiplierStoreModal } from "../components/casino/MultiplierStoreModal";
+import { useCedraBalance } from "../hooks/useCedraBalance";
 import { useGamesNetwork } from "../hooks/useGamesNetwork";
 import { useGameSigner } from "../hooks/useGameSigner";
 import { useChipActions } from "../hooks/poker/useChipActions";
@@ -12,39 +17,24 @@ import { useFreeChips } from "../hooks/poker/useFreeChips";
 import {
   acknowledgeCurrentTerms,
   getCurrentTerms,
-  hasAcknowledgedCurrent,
-  type CasinoTerms
+  hasAcknowledgedCurrent
 } from "../services/consent";
 import { formatChips } from "../services/poker/chips";
-import { ContractsWarning } from "../components/ContractsWarning";
-import "../styles/games.css";
-
-function formatDuration(seconds: number): string {
-  if (seconds <= 0) return "ready";
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const secs = seconds % 60;
-  if (hours > 0) return `${hours}h ${minutes}m`;
-  if (minutes > 0) return `${minutes}m ${secs}s`;
-  return `${secs}s`;
-}
+import "../styles/casino.css";
 
 function isTermsError(message: string | null | undefined): boolean {
-  if (!message) return false;
-  const lower = message.toLowerCase();
-  return (
-    lower.includes("terms") ||
-    lower.includes("acknowledged") ||
-    lower.includes("casino notice")
-  );
+  const safe = String(message ?? "").toLowerCase();
+  return safe.includes("terms") || safe.includes("acknowledge") || safe.includes("casino");
 }
 
 export function CasinoPage() {
   const wallet = useWallet();
   const signer = useGameSigner();
   const network = useGamesNetwork();
+  const navigate = useNavigate();
   const { pushToast } = useToast();
   const address = wallet.account?.address?.toString() ?? "";
+  const { balance: cedraBalance, refreshBalance: refreshCedraBalance } = useCedraBalance(address);
 
   const chipActions = useChipActions({
     network,
@@ -58,69 +48,81 @@ export function CasinoPage() {
     network,
     playerAddress: address
   });
+  const { refreshBalance: refreshChipBalance, refreshMultiplierData } = chipActions;
+  const { refreshClaimStatus } = freeChips;
 
-  const [consentModalOpen, setConsentModalOpen] = useState(false);
+  const [showBoostStore, setShowBoostStore] = useState(false);
+  const [showDisclaimer, setShowDisclaimer] = useState(false);
   const [consentLoading, setConsentLoading] = useState(false);
   const [consentSubmitting, setConsentSubmitting] = useState(false);
-  const [consentTerms, setConsentTerms] = useState<CasinoTerms | null>(null);
+  const [termsMarkdown, setTermsMarkdown] = useState("");
+  const [termsFormat, setTermsFormat] = useState("text/markdown");
   const [consentError, setConsentError] = useState<string | null>(null);
   const [retryAction, setRetryAction] = useState<null | (() => Promise<void>)>(null);
 
-  const { refreshBalance, refreshMultiplierData } = chipActions;
-  const { refreshClaimStatus, canClaim } = freeChips;
-
-  useEffect(() => {
-    if (!wallet.connected || !address) return;
-    void refreshBalance();
-    void refreshMultiplierData();
-    void refreshClaimStatus();
-  }, [
-    address,
-    refreshBalance,
-    refreshClaimStatus,
-    refreshMultiplierData,
-    wallet.connected
-  ]);
-
-  useEffect(() => {
-    if (canClaim) return;
-    const id = window.setInterval(() => {
-      void refreshClaimStatus();
-    }, 10000);
-    return () => window.clearInterval(id);
-  }, [canClaim, refreshClaimStatus]);
-
-  const openConsent = useCallback(async (afterConsent?: () => Promise<void>) => {
-    if (!address) return;
+  const loadConsentState = useCallback(async () => {
+    if (!wallet.connected || !address) {
+      setShowDisclaimer(false);
+      return;
+    }
 
     setConsentLoading(true);
     setConsentError(null);
-    setRetryAction(() => afterConsent ?? null);
+
     try {
       const [terms, acknowledged] = await Promise.all([
         getCurrentTerms(network),
         hasAcknowledgedCurrent(network, address)
       ]);
 
-      if (acknowledged) {
-        if (afterConsent) {
-          await afterConsent();
-        }
-        return;
+      if (terms) {
+        setTermsMarkdown(terms.content);
+        setTermsFormat(terms.format || "text/markdown");
+      } else {
+        setTermsMarkdown("");
+        setTermsFormat("text/markdown");
+        setConsentError("Unable to load the latest casino notice.");
       }
 
-      if (!terms) {
-        setConsentError("Unable to load current casino notice.");
-      }
-      setConsentTerms(terms);
-      setConsentModalOpen(true);
+      setShowDisclaimer(!acknowledged);
     } catch {
-      setConsentError("Unable to load current casino notice.");
-      setConsentModalOpen(true);
+      setTermsMarkdown("");
+      setTermsFormat("text/markdown");
+      setConsentError("Unable to load the latest casino notice.");
+      setShowDisclaimer(true);
     } finally {
       setConsentLoading(false);
     }
-  }, [address, network]);
+  }, [address, network, wallet.connected]);
+
+  useEffect(() => {
+    if (!wallet.connected || !address) return;
+
+    void refreshChipBalance();
+    void refreshMultiplierData();
+    void refreshClaimStatus();
+    void refreshCedraBalance();
+    void loadConsentState();
+  }, [
+    address,
+    loadConsentState,
+    refreshChipBalance,
+    refreshClaimStatus,
+    refreshMultiplierData,
+    refreshCedraBalance,
+    wallet.connected
+  ]);
+
+  useEffect(() => {
+    if (freeChips.canClaim || !wallet.connected || !address) return undefined;
+
+    const timer = window.setInterval(() => {
+      void refreshClaimStatus();
+      void refreshMultiplierData();
+    }, 10_000);
+
+    return () => window.clearInterval(timer);
+  }, [address, freeChips.canClaim, refreshClaimStatus, refreshMultiplierData, wallet.connected]);
 
   const requireSigner = useCallback(() => {
     if (!wallet.connected || !signer) {
@@ -131,187 +133,270 @@ export function CasinoPage() {
       pushToast("error", "Switch wallet network to Cedra Testnet.");
       return null;
     }
+    if (!hasConfiguredGameContracts()) {
+      pushToast("error", "Game contracts are not configured.");
+      return null;
+    }
+
     return signer;
   }, [pushToast, signer, wallet.connected, wallet.networkMismatch]);
+
+  const openDisclaimerForRetry = useCallback(
+    async (nextAction?: () => Promise<void>) => {
+      setRetryAction(() => nextAction ?? null);
+      await loadConsentState();
+      setShowDisclaimer(true);
+    },
+    [loadConsentState]
+  );
 
   const handleClaim = useCallback(async () => {
     const activeSigner = requireSigner();
     if (!activeSigner) return;
 
-    const success = await freeChips.doClaimFreeChips(activeSigner);
-    if (success) {
-      await chipActions.refreshBalance();
+      const success = await freeChips.doClaimFreeChips(activeSigner);
+      if (success) {
+        await Promise.all([
+          refreshChipBalance(),
+          refreshClaimStatus(),
+          refreshCedraBalance()
+        ]);
       pushToast("success", "Free chips claimed.");
       return;
     }
 
     if (isTermsError(freeChips.error)) {
-      await openConsent(async () => {
-        await handleClaim();
-      });
+      await openDisclaimerForRetry(handleClaim);
     }
-  }, [chipActions, freeChips, openConsent, pushToast, requireSigner]);
+  }, [
+    chipActions,
+    freeChips,
+    openDisclaimerForRetry,
+    pushToast,
+    refreshChipBalance,
+    refreshClaimStatus,
+    refreshCedraBalance,
+    requireSigner
+  ]);
 
-  const handlePurchaseBoost = useCallback(async (factor: number) => {
-    const activeSigner = requireSigner();
-    if (!activeSigner) return;
+  const handlePurchase = useCallback(
+    async (factor: number): Promise<boolean> => {
+      const activeSigner = requireSigner();
+      if (!activeSigner) return false;
 
-    const success = await chipActions.doPurchaseMultiplier(activeSigner, factor);
-    if (success) {
-      await freeChips.refreshClaimStatus();
-      pushToast("success", `${factor}x boost activated.`);
-      return;
-    }
+      const success = await chipActions.doPurchaseMultiplier(activeSigner, factor);
+      if (success) {
+        await Promise.all([
+          refreshChipBalance(),
+          refreshMultiplierData(),
+          refreshClaimStatus(),
+          refreshCedraBalance()
+        ]);
+        pushToast("success", `${factor}x multiplier activated.`);
+        return true;
+      }
 
-    if (isTermsError(chipActions.error)) {
-      await openConsent(async () => {
-        await handlePurchaseBoost(factor);
-      });
-    }
-  }, [chipActions, freeChips, openConsent, pushToast, requireSigner]);
+      if (isTermsError(chipActions.error)) {
+        await openDisclaimerForRetry(async () => {
+          await handlePurchase(factor);
+        });
+      }
 
-  const handleAcceptConsent = useCallback(async () => {
+      return false;
+    },
+    [
+      chipActions,
+      freeChips,
+      openDisclaimerForRetry,
+      pushToast,
+      refreshChipBalance,
+      refreshClaimStatus,
+      refreshMultiplierData,
+      refreshCedraBalance,
+      requireSigner
+    ]
+  );
+
+  const handleAcknowledgeDisclaimer = useCallback(async () => {
     const activeSigner = requireSigner();
     if (!activeSigner) return;
 
     setConsentSubmitting(true);
     setConsentError(null);
     try {
-      await acknowledgeCurrentTerms(network, activeSigner);
-      setConsentModalOpen(false);
+      const result = await acknowledgeCurrentTerms(network, activeSigner);
+      if (!result.success) {
+        setConsentError("Acknowledgment transaction failed.");
+        return;
+      }
+
+      setShowDisclaimer(false);
       pushToast("success", "Casino notice acknowledged.");
       if (retryAction) {
-        await retryAction();
+        const nextAction = retryAction;
+        setRetryAction(null);
+        await nextAction();
       }
     } catch (error) {
-      setConsentError(error instanceof Error ? error.message : "Failed to submit acknowledgment.");
+      setConsentError(error instanceof Error ? error.message : "Failed to acknowledge notice.");
     } finally {
       setConsentSubmitting(false);
     }
   }, [network, pushToast, requireSigner, retryAction]);
 
-  const boostTimeLeft = useMemo(() => {
-    if (!chipActions.multiplierStatus.isActive) return 0;
-    const now = Math.floor(Date.now() / 1000);
-    return Math.max(0, chipActions.multiplierStatus.expiresAt - now);
-  }, [chipActions.multiplierStatus.expiresAt, chipActions.multiplierStatus.isActive]);
+  const boostSummary = useMemo(() => {
+    if (!chipActions.multiplierStatus.isActive) {
+      return "No active boost";
+    }
+
+    return `${chipActions.multiplierStatus.factor}x active`;
+  }, [chipActions.multiplierStatus.factor, chipActions.multiplierStatus.isActive]);
+
+  if (!wallet.connected) {
+    return (
+      <section className="games-screen">
+        <GamesTopBar title="Nova Casino" backTo="/games" rightSlot={<WalletButton />} />
+        <div className="games-screen-content">
+          <div className="games-empty-state">
+            Connect your wallet to claim chips, activate boosts, and enter poker tables.
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
-    <section className="games-page">
-      <ContractsWarning />
+    <section className="games-screen">
+      <GamesTopBar title="Nova Casino" backTo="/games" rightSlot={<WalletButton />} />
 
-      <header className="games-hero">
-        <p className="m-0 text-caption uppercase tracking-wide text-nova-cyan">Nova Casino</p>
-        <h1 className="m-0 mt-nova-sm text-h1 text-text-primary">Chips & Boosts</h1>
-        <p className="m-0 mt-nova-sm max-w-2xl text-body text-text-secondary">
-          Claim periodic free chips, activate multipliers, and enter live poker tables.
-        </p>
-      </header>
-
-      <div className="games-grid games-grid-2">
-        <GlassCard className="grid gap-nova-md">
-          <h2 className="games-section-title">Chip Wallet</h2>
-          <p className="m-0 text-body text-text-primary">{formatChips(chipActions.chipBalance)} chips</p>
-          <p className="m-0 text-caption text-text-muted">
-            Approx CEDRA value: {formatCedraFromOctas(BigInt(chipActions.chipBalance * 100_000))}
-          </p>
-          <div className="games-kpi">
-            <div className="item">
-              <p className="label">Base Claim</p>
-              <p className="value">{formatChips(freeChips.dailyAmount)}</p>
-            </div>
-            <div className="item">
-              <p className="label">Boosted Claim</p>
-              <p className="value">{formatChips(freeChips.boostedDailyAmount)}</p>
+      <div className="games-screen-scroll">
+        <div className="games-screen-content">
+          <div className="games-card games-card-hero">
+            <div className="games-section">
+              <p className="games-section-kicker">Daily Rewards</p>
+              <h1 className="games-section-title games-casino-hero-title">Chips & Boosts</h1>
+              <p className="games-section-copy">
+                Claim periodic free chips, activate multipliers, and enter live poker tables.
+              </p>
             </div>
           </div>
-          <NovaButton onClick={() => void handleClaim()} disabled={!freeChips.canClaim || !hasConfiguredGameContracts()}>
-            {freeChips.canClaim ? "Claim Free Chips" : `Next claim in ${formatDuration(freeChips.timeUntilNext)}`}
-          </NovaButton>
-        </GlassCard>
 
-        <GlassCard className="grid gap-nova-md">
-          <h2 className="games-section-title">Boost Store</h2>
-          <p className="m-0 text-caption text-text-muted">
-            Active boost: {chipActions.multiplierStatus.isActive ? `${chipActions.multiplierStatus.factor}x` : "none"}
-            {chipActions.multiplierStatus.isActive ? ` • expires in ${formatDuration(boostTimeLeft)}` : ""}
-          </p>
-          <div className="games-card-list">
-            {chipActions.multiplierOptions.length === 0 ? (
-              <p className="m-0 text-body text-text-muted">No boost options available.</p>
-            ) : (
-              chipActions.multiplierOptions.map((option) => (
-                <div key={option.factor} className="games-list-row">
-                  <div className="meta">
-                    <p className="name">{option.factor}x Multiplier</p>
-                    <p className="sub">Price: {formatCedraFromOctas(option.price)}</p>
-                  </div>
-                  <NovaButton
-                    size="sm"
-                    variant="accent"
-                    disabled={!hasConfiguredGameContracts()}
-                    onClick={() => void handlePurchaseBoost(option.factor)}
-                  >
-                    Buy
-                  </NovaButton>
-                </div>
-              ))
-            )}
-          </div>
-        </GlassCard>
-      </div>
+          {!hasConfiguredGameContracts() ? (
+            <div className="games-empty-state">
+              Configure `VITE_GAME_CONTRACT_ADDRESS` and the games wallet contract env vars to use
+              live casino actions.
+            </div>
+          ) : null}
 
-      <GlassCard className="grid gap-nova-md">
-        <div className="flex flex-wrap items-center justify-between gap-nova-sm">
-          <div>
-            <h2 className="m-0 text-h2 text-text-primary">Poker Tables</h2>
-            <p className="m-0 text-caption text-text-muted">
-              Use your chip balance to join or host Texas Hold&apos;em tables.
+          <FreeChipsCard
+            dailyAmount={freeChips.dailyAmount}
+            boostedDailyAmount={freeChips.boostedDailyAmount}
+            multiplierFactor={freeChips.multiplierFactor}
+            multiplierTimeLeft={freeChips.multiplierTimeLeft}
+            canClaim={freeChips.canClaim}
+            timeUntilNext={freeChips.timeUntilNext}
+            isClaiming={freeChips.isClaiming}
+            error={freeChips.error}
+            onClaim={() => {
+              void handleClaim();
+            }}
+          />
+
+          <div className="games-card games-card-body games-section">
+            <div className="games-inline-row" style={{ justifyContent: "space-between" }}>
+              <div>
+                <p className="games-section-kicker">Boost Store</p>
+                <h2 className="games-section-title">Multiplier Upgrades</h2>
+              </div>
+              <button
+                type="button"
+                className="games-button games-button-accent"
+                onClick={() => setShowBoostStore(true)}
+              >
+                Open Store
+              </button>
+            </div>
+
+            <div className="games-casino-inline-stats">
+              <div className="games-casino-stat-card">
+                <p className="games-casino-stat-label">CEDRA Wallet</p>
+                <p className="games-casino-stat-value">
+                  {formatCedraFromOctas(BigInt(Math.max(cedraBalance, 0)))}
+                </p>
+              </div>
+              <div className="games-casino-stat-card">
+                <p className="games-casino-stat-label">Chip Wallet</p>
+                <p className="games-casino-stat-value">{formatChips(chipActions.chipBalance)}</p>
+              </div>
+            </div>
+
+            <p className="games-casino-disclaimer">
+              {boostSummary}. Current boosted claim:{" "}
+              {formatChips(freeChips.boostedDailyAmount)} chips.
             </p>
           </div>
-          <Link className="nova-btn nova-btn-primary" to="/games/poker">
-            Enter Poker Lobby
-          </Link>
-        </div>
-      </GlassCard>
 
-      {consentModalOpen && (
-        <div className="games-modal-backdrop" role="dialog" aria-modal="true">
-          <div className="games-modal">
-            <h3 className="m-0 text-h2 text-text-primary">Casino Notice</h3>
-            {consentLoading ? (
-              <p className="m-0 text-body text-text-muted">Loading current notice...</p>
-            ) : (
-              <pre className="m-0 max-h-[50vh] overflow-auto whitespace-pre-wrap rounded-nova-standard border border-surface-glass-border bg-surface-glass p-nova-md text-body text-text-secondary">
-                {consentTerms?.content || "No terms available."}
-              </pre>
-            )}
+          <div className="games-card games-card-body games-section">
+            <div>
+              <p className="games-section-kicker">Available Games</p>
+              <h2 className="games-section-title">Live Tables</h2>
+            </div>
 
-            {consentError && (
-              <p className="m-0 text-caption text-status-error">{consentError}</p>
-            )}
-
-            <div className="flex flex-wrap justify-end gap-nova-sm">
-              <NovaButton
-                variant="ghost"
-                onClick={() => {
-                  setConsentModalOpen(false);
-                  setRetryAction(null);
-                }}
-              >
-                Cancel
-              </NovaButton>
-              <NovaButton
-                variant="primary"
-                loading={consentSubmitting}
-                onClick={() => void handleAcceptConsent()}
-              >
-                Accept and Continue
-              </NovaButton>
+            <div className="games-casino-game-row">
+              <img
+                className="games-casino-game-icon"
+                src="/assets/casino/game-icon.png"
+                alt="Poker"
+              />
+              <div className="games-casino-game-meta">
+                <p className="games-casino-game-title">Texas Hold&apos;em</p>
+                <p className="games-casino-game-copy">
+                  Use your chip balance to join direct tables, browse active rooms, or host your
+                  own.
+                </p>
+              </div>
+              <Link className="games-button-link games-button-link-primary" to="/games/poker">
+                Enter
+              </Link>
             </div>
           </div>
         </div>
-      )}
+      </div>
+
+      <MultiplierStoreModal
+        visible={showBoostStore}
+        onClose={() => setShowBoostStore(false)}
+        cedraBalance={BigInt(Math.max(cedraBalance, 0))}
+        chipBalance={chipActions.chipBalance}
+        isPending={chipActions.pendingAction === "purchaseMultiplier"}
+        isSimulating={chipActions.isSimulatingPurchase}
+        error={chipActions.error}
+        onSimulatePurchase={chipActions.simulatePurchaseMultiplier}
+        onPurchase={handlePurchase}
+        multiplierOptions={chipActions.multiplierOptions}
+        multiplierDuration={chipActions.multiplierDuration}
+        multiplierStatus={chipActions.multiplierStatus}
+      />
+
+      <CasinoDisclaimerModal
+        visible={showDisclaimer}
+        onAcknowledge={handleAcknowledgeDisclaimer}
+        onClose={() => {
+          setShowDisclaimer(false);
+          setRetryAction(null);
+          navigate("/games");
+        }}
+        allowClose
+        allowAcknowledge
+        termsMarkdown={termsMarkdown}
+        termsFormat={termsFormat}
+        isLoadingTerms={consentLoading}
+        termsError={consentError}
+        onRetryLoadTerms={() => {
+          void loadConsentState();
+        }}
+        isSubmittingAcknowledge={consentSubmitting}
+      />
     </section>
   );
 }

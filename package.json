@@ -19,6 +19,7 @@
     "@cedra-labs/wallet-standard": "^0.5.1",
     "@hookform/resolvers": "^5.2.2",
     "@noble/hashes": "^1.8.0",
+    "@supabase/supabase-js": "^2.57.4",
     "@tanstack/react-query": "^5.90.7",
     "clsx": "^2.1.1",
     "luxon": "^3.7.2",

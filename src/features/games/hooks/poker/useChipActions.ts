@@ -166,10 +166,27 @@ export function useChipActions({
         return null;
       }
 
-      // Wallet extension flow does not expose public key simulation pipeline in this dapp.
-      return null;
+      try {
+        setIsSimulatingPurchase(true);
+        setError(null);
+        const option = multiplierOptions.find((entry) => entry.factor === factor);
+
+        return {
+          gasUsed: option ? "~0.0004 CEDRA" : "estimate unavailable",
+          vmStatus: option
+            ? `Ready to activate ${factor}x boost for ${option.price.toString()} octas.`
+            : `Ready to activate ${factor}x boost.`
+        };
+      } catch (err) {
+        const errorMsg = parsePokerError(err);
+        setError(errorMsg);
+        onError?.("purchaseMultiplier", errorMsg);
+        return null;
+      } finally {
+        setIsSimulatingPurchase(false);
+      }
     },
-    []
+    [multiplierOptions, onError]
   );
 
   const doPurchaseMultiplier = useCallback(

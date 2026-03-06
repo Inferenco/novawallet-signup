@@ -1,4 +1,7 @@
 export { GamesHubPage } from "./GamesHubPage";
+export { ProfilePage } from "./ProfilePage";
+export { SkillGamesPage } from "./SkillGamesPage";
+export { ThirdPartyGamesPage } from "./ThirdPartyGamesPage";
 export { CasinoPage } from "./CasinoPage";
 export { PokerLandingPage } from "./PokerLandingPage";
 export { PokerTablesPage } from "./PokerTablesPage";

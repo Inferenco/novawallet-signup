@@ -1,52 +1,49 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { GlassCard } from "@/components/ui";
+import { WalletButton } from "@/components/wallet/WalletButton";
 import { useWallet } from "@/providers/WalletProvider";
+import { shortAddress } from "@/lib/format";
+import { GamesTopBar } from "../components/GamesTopBar";
 import { useGamesNetwork } from "../hooks/useGamesNetwork";
 import { getProfile, type UserProfile } from "../services/profiles";
-import { ContractsWarning } from "../components/ContractsWarning";
-import "../styles/games.css";
-
-function truncateAddress(address: string | null): string {
-  if (!address) return "";
-  return `${address.slice(0, 6)}...${address.slice(-4)}`;
-}
+import "../styles/gaming-hub.css";
 
 export function GamesHubPage() {
   const wallet = useWallet();
   const network = useGamesNetwork();
   const address = wallet.account?.address?.toString() ?? null;
-
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [loadingProfile, setLoadingProfile] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [avatarFailed, setAvatarFailed] = useState(false);
 
   useEffect(() => {
-    let isMounted = true;
+    let alive = true;
 
-    const load = async () => {
+    const loadProfile = async () => {
       if (!wallet.connected || !address) {
-        setProfile(null);
+        if (alive) {
+          setProfile(null);
+          setIsLoading(false);
+        }
         return;
       }
 
-      setLoadingProfile(true);
+      setIsLoading(true);
       try {
-        const result = await getProfile(network, address);
-        if (isMounted) {
-          setProfile(result);
+        const nextProfile = await getProfile(network, address);
+        if (alive) {
+          setProfile(nextProfile);
         }
       } finally {
-        if (isMounted) {
-          setLoadingProfile(false);
+        if (alive) {
+          setIsLoading(false);
         }
       }
     };
 
-    void load();
-
+    void loadProfile();
     return () => {
-      isMounted = false;
+      alive = false;
     };
   }, [address, network, wallet.connected]);
 
@@ -54,77 +51,129 @@ export function GamesHubPage() {
     setAvatarFailed(false);
   }, [profile?.avatarUrl]);
 
-  const headerCopy = useMemo(() => {
-    if (!wallet.connected) {
-      return "Connect your wallet to enter Nova Casino, where poker is available.";
-    }
-    if (loadingProfile) {
-      return "Loading your on-chain player profile...";
-    }
-    if (profile?.nickname) {
-      return `Welcome back, ${profile.nickname}.`; 
-    }
-    return "No player profile found for this wallet. You can still play immediately.";
-  }, [loadingProfile, profile?.nickname, wallet.connected]);
+  const navCards = useMemo(
+    () => [
+      {
+        title: "Nova Casino",
+        description: "A free to play daily social casino",
+        to: "/games/casino",
+        image: "/assets/casino/nova-casino-wide.jpg"
+      },
+      {
+        title: "Games of Skill",
+        description: "Strategy & skill-based games",
+        to: "/games/skill-games",
+        image: "/assets/casino/games-of-skill-wide.jpg"
+      },
+      {
+        title: "3rd Party Games",
+        description: "Partner games & integrations",
+        to: "/games/third-party",
+        image: "/assets/casino/third-party-wide.jpg"
+      }
+    ],
+    []
+  );
 
   return (
-    <section className="games-page">
-      <ContractsWarning />
+    <section className="games-screen">
+      <GamesTopBar title="Gaming" rightSlot={<WalletButton />} />
 
-      <header className="games-hero">
-        <span className="nova-badge nova-badge-info w-fit">Nova Games</span>
-        <h1 className="mt-nova-md text-display text-text-primary">Nova Games</h1>
-        <p className="max-w-3xl text-body text-text-secondary">{headerCopy}</p>
-      </header>
+      {isLoading ? (
+        <div className="games-loading-screen">
+          <div className="games-spinner" />
+        </div>
+      ) : (
+        <div className="games-screen-scroll">
+          <div className="games-screen-content">
+            {!wallet.connected ? (
+              <div className="games-card games-profile-setup">
+                <div className="games-profile-setup-icon">◎</div>
+                <div className="games-section">
+                  <h2 className="games-section-title">Connect Your Wallet</h2>
+                  <p className="games-section-copy">
+                    Connect a Cedra wallet to load your gaming profile and open casino or poker
+                    screens.
+                  </p>
+                </div>
+                <div className="games-inline-row" style={{ justifyContent: "center" }}>
+                  <WalletButton />
+                </div>
+              </div>
+            ) : profile?.nickname ? (
+              <>
+                <section className="games-section">
+                  <h2 className="games-section-title">Player Profile</h2>
+                  <div className="games-card games-hub-profile-card">
+                    <Link className="games-hub-edit-link" to="/games/profile" aria-label="Edit profile">
+                      ✎
+                    </Link>
+                    <div className="games-hub-profile-main">
+                      <div className="games-hub-avatar-shell">
+                        {profile.avatarUrl && !avatarFailed ? (
+                          <img
+                            src={profile.avatarUrl}
+                            alt={profile.nickname}
+                            onError={() => setAvatarFailed(true)}
+                          />
+                        ) : (
+                          <span className="games-hub-avatar-fallback">
+                            {profile.nickname.slice(0, 1).toUpperCase()}
+                          </span>
+                        )}
+                      </div>
+                      <div className="games-hub-profile-meta">
+                        <p className="games-hub-profile-name">{profile.nickname}</p>
+                        <span className="games-hub-address-badge">◇ {shortAddress(address ?? "")}</span>
+                      </div>
+                    </div>
+                  </div>
+                </section>
 
-      <GlassCard className="grid gap-nova-md">
-        <h2 className="games-section-title">Player Profile</h2>
-        {!wallet.connected ? (
-          <p className="text-body text-text-muted">
-            Connect your wallet from the top-right menu to load profile and play.
-          </p>
-        ) : (
-          <div className="flex flex-wrap items-center justify-between gap-nova-md">
-            <div className="grid gap-1">
-              <p className="m-0 text-body text-text-primary">
-                {profile?.nickname || "Unnamed Player"}
-              </p>
-              <p className="m-0 text-caption text-text-muted">
-                {truncateAddress(address)}
-              </p>
-            </div>
-            {profile?.avatarUrl && !avatarFailed ? (
-              <img
-                src={profile.avatarUrl}
-                alt={profile.nickname || "player avatar"}
-                className="h-14 w-14 rounded-full border border-surface-glass-border object-cover"
-                onError={() => setAvatarFailed(true)}
-              />
+                <section className="games-section">
+                  <h2 className="games-section-title">Games</h2>
+                  <div className="games-hub-nav-grid">
+                    {navCards.map((card) => (
+                      <Link
+                        key={card.to}
+                        className="games-hub-nav-card"
+                        to={card.to}
+                        style={{ backgroundImage: `url(${card.image})` }}
+                      >
+                        <div>
+                          <p className="games-hub-nav-title">{card.title}</p>
+                          <p className="games-hub-nav-copy">{card.description}</p>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                </section>
+              </>
             ) : (
-              <div className="flex h-14 w-14 items-center justify-center rounded-full border border-surface-glass-border bg-surface-glass text-caption text-text-muted">
-                No
-                <br />
-                Avatar
+              <div className="games-card games-profile-setup">
+                <div className="games-profile-setup-icon">◌</div>
+                <div className="games-section">
+                  <h2 className="games-section-title">Set Up Your Player Profile</h2>
+                  <p className="games-section-copy">
+                    Create a player name to start playing games. Your profile will be visible to
+                    other players.
+                  </p>
+                </div>
+                <div className="games-profile-setup-warning">
+                  <p className="games-profile-setup-warning-title">Gas Required</p>
+                  <p className="games-section-copy">
+                    You need CEDRA in this wallet to create a player profile. This is an on-chain
+                    transaction.
+                  </p>
+                </div>
+                <Link className="games-button-link games-button-link-primary" to="/games/profile">
+                  Set Up Profile
+                </Link>
               </div>
             )}
           </div>
-        )}
-      </GlassCard>
-
-      <div className="games-grid">
-        <Link className="games-nav-card" to="/games/casino">
-          <h3 className="games-nav-card-title">Nova Casino</h3>
-          <p className="games-nav-card-copy">
-            Claim chips, activate boosts, and open poker from inside the casino.
-          </p>
-        </Link>
-      </div>
-
-      <div className="flex flex-wrap gap-nova-sm">
-        <Link className="nova-btn nova-btn-primary" to="/games/casino">
-          Open Casino
-        </Link>
-      </div>
+        </div>
+      )}
     </section>
   );
 }

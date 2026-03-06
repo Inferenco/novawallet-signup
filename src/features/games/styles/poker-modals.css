@@ -1,0 +1,151 @@
+.games-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(2, 6, 14, 0.74);
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+
+.games-modal-panel {
+  width: min(100%, 380px);
+  max-height: 85vh;
+  overflow: auto;
+  padding: 18px 16px;
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(11, 16, 28, 0.96);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.46);
+  display: grid;
+  gap: 14px;
+}
+
+.games-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.games-modal-title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 800;
+}
+
+.games-modal-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.games-modal-inline-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.games-chat-overlay {
+  align-items: flex-end;
+}
+
+.games-chat-panel {
+  width: min(100%, 400px);
+}
+
+.games-chat-messages {
+  max-height: 32vh;
+  overflow: auto;
+  display: grid;
+  gap: 10px;
+}
+
+.games-chat-message {
+  padding: 12px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.games-chat-message-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.56);
+}
+
+.games-chat-message p {
+  margin: 0;
+  color: #fff;
+  line-height: 1.45;
+}
+
+.games-seat-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.games-seat-picker,
+.games-seat-pill {
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.games-seat-picker.active,
+.games-seat-pill-filled {
+  background: rgba(24, 224, 255, 0.14);
+  border-color: rgba(24, 224, 255, 0.32);
+}
+
+.games-seat-pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.games-board-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.games-showdown-card {
+  min-width: 44px;
+  min-height: 58px;
+  padding: 10px 8px;
+  border-radius: 12px;
+  border: 1px solid rgba(113, 168, 255, 0.28);
+  background: rgba(12, 27, 52, 0.78);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+}
+
+.games-showdown-card.small {
+  min-width: 34px;
+  min-height: 46px;
+  padding: 8px 6px;
+}
+
+.games-showdown-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}

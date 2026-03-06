@@ -3,22 +3,37 @@ import { SiteLayout } from "@/components/layout/SiteLayout";
 import { LandingPage } from "@/pages/LandingPage";
 import { EventsPage } from "@/pages/EventsPage";
 import { MyEventsPage } from "@/pages/MyEventsPage";
-import { GamesPage } from "@/pages/GamesPage";
 import { PrivacyPage } from "@/pages/PrivacyPage";
 import { appEnv } from "@/config/env";
 import {
   CasinoPage,
+  GamesHubPage,
   PokerCreatePage,
   PokerGameplayPage,
   PokerLandingPage,
-  PokerTablesPage
+  PokerTablesPage,
+  ProfilePage,
+  SkillGamesPage,
+  ThirdPartyGamesPage
 } from "@/features/games/pages";
+import { GamesMobileLayout } from "@/features/games/components/GamesMobileLayout";
 
 export const router = createBrowserRouter(
   [
     {
-      path: "/games/poker/:tableAddress",
-      element: <PokerGameplayPage />
+      path: "/games",
+      element: <GamesMobileLayout />,
+      children: [
+        { index: true, element: <GamesHubPage /> },
+        { path: "profile", element: <ProfilePage /> },
+        { path: "skill-games", element: <SkillGamesPage /> },
+        { path: "third-party", element: <ThirdPartyGamesPage /> },
+        { path: "casino", element: <CasinoPage /> },
+        { path: "poker", element: <PokerLandingPage /> },
+        { path: "poker/tables", element: <PokerTablesPage /> },
+        { path: "poker/create", element: <PokerCreatePage /> },
+        { path: "poker/:tableAddress", element: <PokerGameplayPage /> }
+      ]
     },
     {
       path: "/",
@@ -27,11 +42,6 @@ export const router = createBrowserRouter(
         { index: true, element: <LandingPage /> },
         { path: "events", element: <EventsPage /> },
         { path: "my-events", element: <MyEventsPage /> },
-        { path: "games", element: <GamesPage /> },
-        { path: "games/casino", element: <CasinoPage /> },
-        { path: "games/poker", element: <PokerLandingPage /> },
-        { path: "games/poker/tables", element: <PokerTablesPage /> },
-        { path: "games/poker/create", element: <PokerCreatePage /> },
         { path: "privacy", element: <PrivacyPage /> },
         { path: "*", element: <Navigate to="/" replace /> }
       ]

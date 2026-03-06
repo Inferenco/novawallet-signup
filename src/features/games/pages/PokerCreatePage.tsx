@@ -1,26 +1,22 @@
 import { useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { GlassCard, NovaButton, NovaInput } from "@/components/ui";
+import { useNavigate } from "react-router-dom";
+import { WalletButton } from "@/components/wallet/WalletButton";
+import { hasConfiguredGameContracts } from "@/config/env";
 import { useToast } from "@/providers/ToastProvider";
 import { useWallet } from "@/providers/WalletProvider";
-import { hasConfiguredGameContracts } from "@/config/env";
+import { GamesTopBar } from "../components/GamesTopBar";
+import { MAX_SEATS, SPEED_LABELS, TABLE_COLORS, TABLE_SPEEDS } from "../config/games";
 import { useGamesNetwork } from "../hooks/useGamesNetwork";
 import { useGameSigner } from "../hooks/useGameSigner";
-import {
-  MAX_SEATS,
-  SPEED_LABELS,
-  TABLE_COLORS,
-  TABLE_SPEEDS
-} from "../config/games";
 import { createTable } from "../services/poker/actions";
-import { parsePokerError } from "../utils/poker/errors";
+import { formatChips } from "../services/poker/chips";
 import { usePokerTablesStore } from "../stores/poker/tables";
-import { ContractsWarning } from "../components/ContractsWarning";
-import "../styles/games.css";
+import { parsePokerError } from "../utils/poker/errors";
+import "../styles/poker-lobby.css";
 
 function parseInteger(value: string): number {
-  const n = Number.parseInt(value, 10);
-  return Number.isFinite(n) ? n : Number.NaN;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) ? parsed : Number.NaN;
 }
 
 export function PokerCreatePage() {
@@ -58,11 +54,13 @@ export function PokerCreatePage() {
     const bb = parseInteger(bigBlind);
     const min = parseInteger(minBuyIn);
     const max = parseInteger(maxBuyIn);
+
     if (Number.isNaN(sb) || sb <= 0) return false;
     if (Number.isNaN(bb) || bb <= 0) return false;
     if (bb < sb) return false;
     if (Number.isNaN(min) || min < bb) return false;
     if (Number.isNaN(max) || max < min) return false;
+
     return !nameError;
   }, [bigBlind, minBuyIn, maxBuyIn, nameError, smallBlind]);
 
@@ -80,7 +78,7 @@ export function PokerCreatePage() {
       return;
     }
     if (!valid) {
-      pushToast("error", nameError || "Please fix table settings.");
+      pushToast("error", nameError || "Please fix the table settings.");
       return;
     }
 
@@ -109,114 +107,176 @@ export function PokerCreatePage() {
   };
 
   return (
-    <section className="games-page">
-      <ContractsWarning />
+    <section className="games-screen">
+      <GamesTopBar title="Create Table" backTo="/games/poker" rightSlot={<WalletButton />} />
 
-      <header className="games-hero">
-        <p className="m-0 text-caption uppercase tracking-wide text-nova-cyan">Host Table</p>
-        <h1 className="m-0 mt-nova-sm text-h1 text-text-primary">Create Poker Table</h1>
-        <p className="m-0 mt-nova-sm max-w-2xl text-body text-text-secondary">
-          Configure blinds, buy-in range, speed, and table theme.
-        </p>
-      </header>
+      <div className="games-screen-scroll">
+        <div className="games-screen-content">
+          <div className="games-card games-card-body games-section">
+            <div className="games-inline-row" style={{ justifyContent: "space-between" }}>
+              <div>
+                <p className="games-section-kicker">Host Table</p>
+                <h1 className="games-section-title">Create Poker Table</h1>
+              </div>
+              <p className="games-status-text">{tableName.length}/32</p>
+            </div>
 
-      <GlassCard className="games-form-grid two">
-        <NovaInput
-          label="Table name (optional)"
-          value={tableName}
-          maxLength={32}
-          onChange={(event) => setTableName(event.target.value)}
-          placeholder="My Poker Table"
-          error={nameError || undefined}
-        />
+            <label className="games-field">
+              <span className="games-field-label">Table name (optional)</span>
+              <input
+                className="games-input"
+                maxLength={32}
+                placeholder="My Poker Table"
+                value={tableName}
+                onChange={(event) => setTableName(event.target.value)}
+              />
+            </label>
+            {nameError ? <p className="games-status-text games-status-error">{nameError}</p> : null}
+          </div>
 
-        <div className="grid gap-nova-sm">
-          <p className="m-0 text-caption text-text-secondary">Table theme</p>
-          <div className="games-pill-row">
-            {Object.entries(TABLE_COLORS).map(([idx, theme]) => (
-              <button
-                key={idx}
-                type="button"
-                className={`games-pill ${colorIndex === Number(idx) ? "active" : ""}`}
-                style={{ borderColor: theme.accent }}
-                onClick={() => setColorIndex(Number(idx))}
-              >
-                {theme.name}
-              </button>
-            ))}
+          <div className="games-card games-card-body games-section">
+            <div>
+              <p className="games-section-kicker">Theme</p>
+              <h2 className="games-section-title">Table Color</h2>
+            </div>
+            <div className="games-poker-color-grid">
+              {Object.entries(TABLE_COLORS).map(([idx, theme]) => (
+                <button
+                  key={idx}
+                  type="button"
+                  className={`games-poker-color-swatch ${colorIndex === Number(idx) ? "active" : ""}`}
+                  style={{ background: theme.accent }}
+                  onClick={() => setColorIndex(Number(idx))}
+                  aria-label={theme.name}
+                />
+              ))}
+            </div>
+          </div>
+
+          <div className="games-card games-card-body games-section">
+            <div>
+              <p className="games-section-kicker">Blinds</p>
+              <h2 className="games-section-title">Stakes</h2>
+            </div>
+            <div className="games-grid-two">
+              <label className="games-field">
+                <span className="games-field-label">Small blind</span>
+                <input
+                  className="games-input"
+                  inputMode="numeric"
+                  value={smallBlind}
+                  onChange={(event) => setSmallBlind(event.target.value)}
+                />
+              </label>
+              <label className="games-field">
+                <span className="games-field-label">Big blind</span>
+                <input
+                  className="games-input"
+                  inputMode="numeric"
+                  value={bigBlind}
+                  onChange={(event) => setBigBlind(event.target.value)}
+                />
+              </label>
+            </div>
+          </div>
+
+          <div className="games-card games-card-body games-section">
+            <div>
+              <p className="games-section-kicker">Buy-In Range</p>
+              <h2 className="games-section-title">Entry Limits</h2>
+            </div>
+            <div className="games-grid-two">
+              <label className="games-field">
+                <span className="games-field-label">Minimum</span>
+                <input
+                  className="games-input"
+                  inputMode="numeric"
+                  value={minBuyIn}
+                  onChange={(event) => setMinBuyIn(event.target.value)}
+                />
+              </label>
+              <label className="games-field">
+                <span className="games-field-label">Maximum</span>
+                <input
+                  className="games-input"
+                  inputMode="numeric"
+                  value={maxBuyIn}
+                  onChange={(event) => setMaxBuyIn(event.target.value)}
+                />
+              </label>
+            </div>
+          </div>
+
+          <div className="games-card games-card-body games-section">
+            <label className="games-field">
+              <span className="games-field-label">Ante (optional)</span>
+              <input
+                className="games-input"
+                inputMode="numeric"
+                value={ante}
+                onChange={(event) => setAnte(event.target.value)}
+              />
+            </label>
+
+            <label className="games-poker-switch-row">
+              <div>
+                <p className="games-section-title" style={{ fontSize: "1rem" }}>
+                  Allow Straddle
+                </p>
+                <p className="games-section-copy">UTG may post 2x big blind preflop.</p>
+              </div>
+              <input
+                type="checkbox"
+                checked={straddleEnabled}
+                onChange={(event) => setStraddleEnabled(event.target.checked)}
+              />
+            </label>
+          </div>
+
+          <div className="games-card games-card-body games-section">
+            <div>
+              <p className="games-section-kicker">Speed</p>
+              <h2 className="games-section-title">Action Timer</h2>
+            </div>
+            <div className="games-poker-speed-grid">
+              {Object.entries(SPEED_LABELS).map(([speed, label]) => (
+                <button
+                  key={speed}
+                  type="button"
+                  className={`games-button ${tableSpeed === Number(speed) ? "games-button-accent" : "games-button-secondary"}`}
+                  onClick={() => setTableSpeed(Number(speed))}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <div className="games-poker-chip-seats">
+              Seats fixed at {MAX_SEATS} players • Buy-in {formatChips(parseInteger(minBuyIn) || 0)}-
+              {formatChips(parseInteger(maxBuyIn) || 0)}
+            </div>
+          </div>
+
+          <div className="games-inline-row" style={{ justifyContent: "space-between" }}>
+            <button
+              type="button"
+              className="games-button games-button-primary"
+              disabled={!valid || submitting}
+              onClick={() => {
+                void handleCreate();
+              }}
+            >
+              {submitting ? "Creating..." : "Create Table"}
+            </button>
+            <button
+              type="button"
+              className="games-button games-button-secondary"
+              onClick={() => navigate("/games/poker")}
+            >
+              Cancel
+            </button>
           </div>
         </div>
-
-        <NovaInput
-          label="Small blind"
-          value={smallBlind}
-          onChange={(event) => setSmallBlind(event.target.value)}
-          inputMode="numeric"
-        />
-        <NovaInput
-          label="Big blind"
-          value={bigBlind}
-          onChange={(event) => setBigBlind(event.target.value)}
-          inputMode="numeric"
-        />
-
-        <NovaInput
-          label="Min buy-in"
-          value={minBuyIn}
-          onChange={(event) => setMinBuyIn(event.target.value)}
-          inputMode="numeric"
-        />
-        <NovaInput
-          label="Max buy-in"
-          value={maxBuyIn}
-          onChange={(event) => setMaxBuyIn(event.target.value)}
-          inputMode="numeric"
-        />
-
-        <NovaInput
-          label="Ante"
-          value={ante}
-          onChange={(event) => setAnte(event.target.value)}
-          inputMode="numeric"
-        />
-
-        <div className="grid gap-nova-sm">
-          <p className="m-0 text-caption text-text-secondary">Table speed</p>
-          <div className="games-pill-row">
-            {Object.entries(SPEED_LABELS).map(([speed, label]) => (
-              <button
-                key={speed}
-                type="button"
-                className={`games-pill ${tableSpeed === Number(speed) ? "active" : ""}`}
-                onClick={() => setTableSpeed(Number(speed))}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <label className="flex items-center gap-nova-sm rounded-nova-standard border border-surface-glass-border bg-surface-glass p-nova-md text-body text-text-secondary">
-          <input
-            type="checkbox"
-            checked={straddleEnabled}
-            onChange={(event) => setStraddleEnabled(event.target.checked)}
-          />
-          Allow straddle
-        </label>
-      </GlassCard>
-
-      <GlassCard className="grid gap-nova-sm">
-        <p className="m-0 text-caption text-text-muted">Seats are fixed at {MAX_SEATS} players.</p>
-        <div className="flex flex-wrap gap-nova-sm">
-          <NovaButton onClick={() => void handleCreate()} disabled={!valid || submitting} loading={submitting}>
-            Create Table
-          </NovaButton>
-          <Link className="nova-btn nova-btn-ghost" to="/games/poker">
-            Cancel
-          </Link>
-        </div>
-      </GlassCard>
+      </div>
     </section>
   );
 }

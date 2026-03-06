@@ -12,6 +12,8 @@ export interface AppEnv {
   gameContractAddress: string;
   gamesWalletContractAddress: string;
   gamesIndexerUrl: string;
+  supabaseUrl: string;
+  supabaseAnonKey: string;
   zedraInstallUrl: string;
   explorerTxBaseUrl: string;
   basePath: string;
@@ -32,6 +34,8 @@ export const appEnv: AppEnv = {
     fromEnv.VITE_WALLET_CONTRACT_ADDRESS ||
     "0x0",
   gamesIndexerUrl: fromEnv.VITE_GAMES_INDEXER_URL || DEFAULT_INDEXER,
+  supabaseUrl: fromEnv.VITE_SUPABASE_URL || "",
+  supabaseAnonKey: fromEnv.VITE_SUPABASE_ANON_KEY || "",
   zedraInstallUrl: fromEnv.VITE_ZEDRA_INSTALL_URL || DEFAULT_ZEDRA_INSTALL_URL,
   explorerTxBaseUrl: fromEnv.VITE_CEDRA_EXPLORER_TX_BASE || DEFAULT_EXPLORER_BASE,
   basePath: fromEnv.VITE_BASE_PATH || "/",
@@ -49,4 +53,8 @@ export function hasConfiguredGamesWalletContract(): boolean {
 
 export function hasConfiguredGameContracts(): boolean {
   return appEnv.gameContractAddress !== "0x0" && hasConfiguredGamesWalletContract();
+}
+
+export function hasConfiguredSupabase(): boolean {
+  return Boolean(appEnv.supabaseUrl && appEnv.supabaseAnonKey);
 }

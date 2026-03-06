@@ -1,10 +1,18 @@
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties
+} from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useToast } from "@/providers/ToastProvider";
 import { useWallet } from "@/providers/WalletProvider";
 import { hasConfiguredGameContracts } from "@/config/env";
 import { useGamesNetwork } from "../hooks/useGamesNetwork";
 import { useGameSigner } from "../hooks/useGameSigner";
+import { useChipActions } from "../hooks/poker/useChipActions";
 import {
   usePokerTableStore,
   useIsAdmin,
@@ -28,8 +36,14 @@ import {
 import { parsePokerError } from "../utils/poker/errors";
 import { formatCard } from "../utils/poker/cards";
 import { formatChips } from "../services/poker/chips";
+import { fetchHandResults } from "../services/poker/indexer";
 import { getProfiles, type UserProfile } from "../services/profiles";
 import { deriveThemeFromColor } from "../utils/theme";
+import { ChatProvider, useChatContext } from "../context/chat";
+import { AbortVoteModal } from "../components/poker/AbortVoteModal";
+import { ChatPanel } from "../components/poker/ChatPanel";
+import { JoinTableModal } from "../components/poker/JoinTableModal";
+import { ShowdownModal } from "../components/poker/ShowdownModal";
 import "../styles/games.css";
 
 const NORMAL_POLL = 3000;
@@ -58,11 +72,50 @@ type OwnerEditorMode = "main" | "blinds" | "buyin" | "kick";
 
 export function PokerGameplayPage() {
   const { tableAddress } = useParams<{ tableAddress: string }>();
+  const wallet = useWallet();
+  const network = useGamesNetwork();
+  const walletAddress = wallet.account?.address?.toString() ?? null;
+  const tableId = tableAddress ? `${network}:${tableAddress}` : null;
+
+  return (
+    <ChatProvider tableId={tableId} walletAddress={walletAddress} network={network}>
+      <PokerGameplayContent tableAddress={tableAddress} />
+    </ChatProvider>
+  );
+}
+
+interface PokerGameplayContentProps {
+  tableAddress?: string;
+}
+
+interface ShowdownState {
+  visible: boolean;
+  winners: Array<{
+    address: string;
+    amount: number;
+    holeCards: number[];
+    handType: number;
+    seatIndex: number;
+  }>;
+  resultType: "showdown" | "fold_win";
+  totalPot: number;
+  communityCards: number[];
+  handNumber: number;
+  showdownPlayers: Array<{
+    address: string;
+    seatIndex: number;
+    holeCards: number[];
+    handType: number;
+  }>;
+}
+
+function PokerGameplayContent({ tableAddress }: PokerGameplayContentProps) {
   const navigate = useNavigate();
   const wallet = useWallet();
   const signer = useGameSigner();
   const network = useGamesNetwork();
   const { pushToast } = useToast();
+  const { unreadCount, clearMessages, setIsTableOwner } = useChatContext();
   const address = wallet.account?.address?.toString() ?? "";
   const contractsReady = hasConfiguredGameContracts();
 
@@ -91,14 +144,24 @@ export function PokerGameplayPage() {
   const needsCommit = useNeedsCommit(address || undefined);
   const needsReveal = useNeedsReveal(address || undefined);
   const isAdmin = useIsAdmin(address || undefined);
+  const chipActions = useChipActions({
+    network,
+    playerAddress: address
+  });
+  const { refreshBalance: refreshChipBalance } = chipActions;
 
   const [playerProfiles, setPlayerProfiles] = useState<Map<string, UserProfile | null>>(new Map());
   const [joinSeat, setJoinSeat] = useState<number | null>(null);
   const [joinBuyIn, setJoinBuyIn] = useState("200");
   const [raiseToAmount, setRaiseToAmount] = useState("");
   const [raiseRatio, setRaiseRatio] = useState(50);
+  const [showChat, setShowChat] = useState(false);
+  const [showJoinModal, setShowJoinModal] = useState(false);
   const [showOwnerPanel, setShowOwnerPanel] = useState(false);
   const [showAbortPanel, setShowAbortPanel] = useState(false);
+  const [actionLocked, setActionLocked] = useState(false);
+  const [actionLockHand, setActionLockHand] = useState<number | null>(null);
+  const [actionLockPhase, setActionLockPhase] = useState<number | null>(null);
   const [ownerEditorMode, setOwnerEditorMode] = useState<OwnerEditorMode>("main");
   const [newSmallBlind, setNewSmallBlind] = useState("");
   const [newBigBlind, setNewBigBlind] = useState("");
@@ -106,6 +169,15 @@ export function PokerGameplayPage() {
   const [newMaxBuyIn, setNewMaxBuyIn] = useState("");
   const [nowMs, setNowMs] = useState(0);
   const [failedAvatarUrls, setFailedAvatarUrls] = useState<Set<string>>(new Set());
+  const [showdownData, setShowdownData] = useState<ShowdownState>({
+    visible: false,
+    winners: [],
+    resultType: "showdown",
+    totalPot: 0,
+    communityCards: [],
+    handNumber: 0,
+    showdownPlayers: []
+  });
 
   const commitReveal = useCommitReveal({
     network,
@@ -191,6 +263,15 @@ export function PokerGameplayPage() {
   }, [address, contractsReady, network, refreshTableData, reset, setActiveTable, tableAddress]);
 
   useEffect(() => {
+    if (!wallet.connected || !address) return;
+    void refreshChipBalance();
+  }, [address, refreshChipBalance, wallet.connected]);
+
+  useEffect(() => {
+    setIsTableOwner(isAdmin);
+  }, [isAdmin, setIsTableOwner]);
+
+  useEffect(() => {
     const initializeId = window.setTimeout(() => {
       setNowMs(Date.now());
     }, 0);
@@ -246,6 +327,139 @@ export function PokerGameplayPage() {
     }
   }, [error, navigate, pushToast]);
 
+  useEffect(() => {
+    if (!actionLocked) return;
+
+    if (phase < GAME_PHASES.PREFLOP || phase > GAME_PHASES.RIVER) {
+      setActionLocked(false);
+      return;
+    }
+    if (!isMyTurn) {
+      setActionLocked(false);
+      return;
+    }
+    if (actionLockPhase !== null && phase !== actionLockPhase) {
+      setActionLocked(false);
+      return;
+    }
+    if (actionLockHand !== null && tableState?.handNumber && tableState.handNumber !== actionLockHand) {
+      setActionLocked(false);
+    }
+  }, [actionLockHand, actionLockPhase, actionLocked, isMyTurn, phase, tableState?.handNumber]);
+
+  const previousPhaseRef = useRef<number | null>(null);
+  const previousHandNumberRef = useRef<number | null>(null);
+  const processedHandsRef = useRef<Set<number>>(new Set());
+  const latestHandRef = useRef(0);
+
+  useEffect(() => {
+    previousPhaseRef.current = null;
+    previousHandNumberRef.current = null;
+    processedHandsRef.current = new Set();
+    latestHandRef.current = 0;
+    setShowdownData((current) => ({ ...current, visible: false }));
+  }, [tableAddress]);
+
+  useEffect(() => {
+    const prevPhase = previousPhaseRef.current;
+    const currentPhase = phase;
+    const prevHand = previousHandNumberRef.current;
+    const currentHand = tableState?.handNumber || 0;
+
+    previousPhaseRef.current = currentPhase;
+    previousHandNumberRef.current = currentHand;
+    latestHandRef.current = currentHand;
+
+    const wasInActiveHand = prevPhase !== null && prevPhase >= GAME_PHASES.PREFLOP;
+    const phaseToWaiting = wasInActiveHand && currentPhase === GAME_PHASES.WAITING;
+    const phaseToShowdown =
+      currentPhase === GAME_PHASES.SHOWDOWN &&
+      (prevPhase === null || prevPhase !== GAME_PHASES.SHOWDOWN);
+    const handIncremented = currentHand > (prevHand || 0);
+
+    let targetHand: number | null = null;
+
+    if (prevPhase === null || prevHand === null) {
+      if (currentPhase === GAME_PHASES.SHOWDOWN) {
+        targetHand = currentHand;
+      }
+    } else {
+      if (currentHand > prevHand) {
+        setShowdownData((current) => ({ ...current, visible: false }));
+      }
+
+      if (handIncremented) {
+        targetHand = prevHand;
+      } else if (phaseToWaiting || phaseToShowdown) {
+        targetHand = currentHand;
+      }
+    }
+
+    if (targetHand === null || processedHandsRef.current.has(targetHand) || !tableAddress) {
+      return;
+    }
+
+    processedHandsRef.current.add(targetHand);
+    let attempt = 0;
+    const maxAttempts = 8;
+
+    const fetchResult = () => {
+      void fetchHandResults(network, tableAddress, 10)
+        .then((events) => {
+          const event = events.find((entry) => entry.handNumber === targetHand);
+          if (event) {
+            const showdownPlayers = event.showdownPlayers.map((playerAddress, index) => ({
+              address: playerAddress,
+              seatIndex: event.showdownSeats[index] || 0,
+              holeCards: event.showdownHoleCards[index] || [],
+              handType: event.showdownHandTypes[index] || 0
+            }));
+
+            const winners = event.winnerPlayers.map((winnerAddress, index) => {
+              const seatIndex = event.winnerSeats[index] || 0;
+              const showdownIndex = event.showdownSeats.indexOf(seatIndex);
+
+              return {
+                address: winnerAddress,
+                amount: event.winnerAmounts[index] || 0,
+                holeCards: showdownIndex >= 0 ? event.showdownHoleCards[showdownIndex] || [] : [],
+                handType: showdownIndex >= 0 ? event.showdownHandTypes[showdownIndex] || 0 : 0,
+                seatIndex
+              };
+            });
+
+            if (latestHandRef.current > targetHand) {
+              return;
+            }
+
+            setShowdownData({
+              visible: true,
+              winners,
+              resultType: event.resultType === 1 ? "fold_win" : "showdown",
+              totalPot: event.totalPot,
+              communityCards: event.communityCards,
+              handNumber: event.handNumber,
+              showdownPlayers
+            });
+            return;
+          }
+
+          if (attempt < maxAttempts) {
+            attempt += 1;
+            window.setTimeout(fetchResult, 1500);
+          }
+        })
+        .catch(() => {
+          if (attempt < maxAttempts) {
+            attempt += 1;
+            window.setTimeout(fetchResult, 1500);
+          }
+        });
+    };
+
+    fetchResult();
+  }, [network, phase, tableAddress, tableState?.handNumber]);
+
   const requireSigner = useCallback(() => {
     if (!contractsReady) {
       pushToast("error", "Game contract addresses are not configured.");
@@ -275,15 +489,26 @@ export function PokerGameplayPage() {
   const maxRaiseTo = myCurrentBet + myStack;
 
   const runAction = useCallback(
-    async (action: (activeSigner: NonNullable<typeof signer>) => Promise<boolean>) => {
+    async (
+      action: (activeSigner: NonNullable<typeof signer>) => Promise<boolean>,
+      options?: { lockOnSuccess?: boolean }
+    ) => {
+      if (options?.lockOnSuccess && actionLocked) return false;
+
       const activeSigner = requireSigner();
-      if (!activeSigner) return;
+      if (!activeSigner) return false;
       const ok = await action(activeSigner);
       if (ok) {
+        if (options?.lockOnSuccess) {
+          setActionLocked(true);
+          setActionLockHand(tableState?.handNumber ?? null);
+          setActionLockPhase(phase);
+        }
         await onActionSuccess();
       }
+      return ok;
     },
-    [onActionSuccess, requireSigner]
+    [actionLocked, onActionSuccess, phase, requireSigner, tableState?.handNumber]
   );
 
   const calculateRaiseFromRatio = useCallback(
@@ -316,13 +541,14 @@ export function PokerGameplayPage() {
     [calculateRaiseFromRatio]
   );
 
-  const handleJoin = useCallback(async () => {
-    if (joinSeat === null) {
+  const handleJoin = useCallback(async (seatOverride?: number, buyInOverride?: bigint) => {
+    const selectedSeat = seatOverride ?? joinSeat;
+    if (selectedSeat === null) {
       pushToast("error", "Select an empty seat first.");
       return;
     }
 
-    const buyIn = Number.parseInt(joinBuyIn, 10);
+    const buyIn = buyInOverride ? Number(buyInOverride) : Number.parseInt(joinBuyIn, 10);
     if (!Number.isFinite(buyIn) || buyIn <= 0) {
       pushToast("error", "Enter a valid buy-in amount.");
       return;
@@ -336,9 +562,14 @@ export function PokerGameplayPage() {
       return;
     }
 
-    await runAction((activeSigner) =>
-      tableActions.doJoin(activeSigner, joinSeat, BigInt(buyIn))
+    const joined = await runAction(
+      (activeSigner) => tableActions.doJoin(activeSigner, selectedSeat, BigInt(buyIn)),
+      undefined
     );
+    if (joined) {
+      setShowJoinModal(false);
+      setJoinSeat(null);
+    }
   }, [joinBuyIn, joinSeat, pushToast, runAction, summary, tableActions]);
 
   const getProfileForAddress = useCallback(
@@ -525,9 +756,9 @@ export function PokerGameplayPage() {
             <button
               type="button"
               className="games-wallet-icon-btn"
-              onClick={() => poll()}
+              onClick={() => setShowChat((current) => !current)}
             >
-              Refresh
+              Chat{unreadCount > 0 && !showChat ? ` (${unreadCount})` : ""}
             </button>
             <button
               type="button"
@@ -585,7 +816,12 @@ export function PokerGameplayPage() {
               type="button"
               className="games-wallet-mini-btn games-wallet-mini-btn-danger"
               disabled={!timeoutHandler.canCallTimeout}
-              onClick={() => void runAction((activeSigner) => timeoutHandler.callTimeout(activeSigner))}
+              onClick={() =>
+                void runAction(
+                  (activeSigner) => timeoutHandler.callTimeout(activeSigner),
+                  { lockOnSuccess: true }
+                )
+              }
             >
               Timeout
             </button>
@@ -662,6 +898,7 @@ export function PokerGameplayPage() {
                   onClick={() => {
                     if (canJoinThisSeat) {
                       setJoinSeat(actualSeatIndex);
+                      setShowJoinModal(true);
                     }
                   }}
                   disabled={!canJoinThisSeat}
@@ -739,24 +976,18 @@ export function PokerGameplayPage() {
         )}
 
         {mySeatIndex === null && (
-          <div className="games-wallet-join-bar">
-            <div className="games-wallet-join-seat-label">
-              Selected seat: {joinSeat !== null ? joinSeat + 1 : "none"}
-            </div>
-            <input
-              className="games-wallet-text-input"
-              value={joinBuyIn}
-              onChange={(event) => setJoinBuyIn(event.target.value)}
-              placeholder={summary ? `${summary.minBuyIn}` : "Buy-in"}
-            />
+          <div className="games-wallet-waiting-controls">
             <button
               type="button"
-              className="games-wallet-join-btn"
-              disabled={joinSeat === null}
-              onClick={() => void handleJoin()}
+              className="games-wallet-start-btn"
+              disabled={chipActions.chipBalance <= 0 || !summary || summary.occupiedSeats >= summary.totalSeats}
+              onClick={() => setShowJoinModal(true)}
             >
-              Join Selected Seat
+              {chipActions.chipBalance <= 0 ? "No Chips" : "Join Table"}
             </button>
+            <Link className="games-wallet-leave-btn" to="/games/poker">
+              Back
+            </Link>
           </div>
         )}
 
@@ -823,7 +1054,7 @@ export function PokerGameplayPage() {
                   type="button"
                   className="games-wallet-preset-btn"
                   onClick={() => setRaisePreset(0)}
-                  disabled={!inBettingRound || !isMyTurn}
+                  disabled={!inBettingRound || !isMyTurn || actionLocked}
                 >
                   MIN
                 </button>
@@ -831,7 +1062,7 @@ export function PokerGameplayPage() {
                   type="button"
                   className="games-wallet-preset-btn"
                   onClick={() => setRaisePreset(50)}
-                  disabled={!inBettingRound || !isMyTurn}
+                  disabled={!inBettingRound || !isMyTurn || actionLocked}
                 >
                   50%
                 </button>
@@ -839,7 +1070,7 @@ export function PokerGameplayPage() {
                   type="button"
                   className="games-wallet-preset-btn"
                   onClick={() => setRaisePreset(100)}
-                  disabled={!inBettingRound || !isMyTurn}
+                  disabled={!inBettingRound || !isMyTurn || actionLocked}
                 >
                   MAX
                 </button>
@@ -850,7 +1081,7 @@ export function PokerGameplayPage() {
                 max={100}
                 value={raiseRatio}
                 className="games-wallet-raise-slider"
-                disabled={!inBettingRound || !isMyTurn || maxRaiseTo <= minRaiseTo}
+                disabled={!inBettingRound || !isMyTurn || maxRaiseTo <= minRaiseTo || actionLocked}
                 onChange={(event) => {
                   const ratio = Number.parseInt(event.target.value, 10);
                   setRaiseRatio(ratio);
@@ -863,31 +1094,46 @@ export function PokerGameplayPage() {
               <button
                 type="button"
                 className="games-wallet-action-btn fold"
-                disabled={!isMyTurn || !inBettingRound}
-                onClick={() => void runAction((activeSigner) => bettingActions.doFold(activeSigner))}
+                disabled={!isMyTurn || !inBettingRound || actionLocked}
+                onClick={() =>
+                  void runAction(
+                    (activeSigner) => bettingActions.doFold(activeSigner),
+                    { lockOnSuccess: true }
+                  )
+                }
               >
                 Fold
               </button>
               <button
                 type="button"
                 className="games-wallet-action-btn check"
-                disabled={!isMyTurn || !inBettingRound || !canCheck}
-                onClick={() => void runAction((activeSigner) => bettingActions.doCheck(activeSigner))}
+                disabled={!isMyTurn || !inBettingRound || !canCheck || actionLocked}
+                onClick={() =>
+                  void runAction(
+                    (activeSigner) => bettingActions.doCheck(activeSigner),
+                    { lockOnSuccess: true }
+                  )
+                }
               >
                 Check
               </button>
               <button
                 type="button"
                 className="games-wallet-action-btn call"
-                disabled={!isMyTurn || !inBettingRound || canCheck}
-                onClick={() => void runAction((activeSigner) => bettingActions.doCall(activeSigner))}
+                disabled={!isMyTurn || !inBettingRound || canCheck || actionLocked}
+                onClick={() =>
+                  void runAction(
+                    (activeSigner) => bettingActions.doCall(activeSigner),
+                    { lockOnSuccess: true }
+                  )
+                }
               >
                 Call {formatChips(callAmount)}
               </button>
               <button
                 type="button"
                 className="games-wallet-action-btn raise"
-                disabled={!isMyTurn || !inBettingRound}
+                disabled={!isMyTurn || !inBettingRound || actionLocked}
                 onClick={() => {
                   const parsed = Number.parseInt(raiseToAmount, 10);
                   if (!Number.isFinite(parsed) || parsed <= 0) {
@@ -898,7 +1144,10 @@ export function PokerGameplayPage() {
                     pushToast("error", `Raise must be at least ${formatChips(minRaiseTo)}.`);
                     return;
                   }
-                  void runAction((activeSigner) => bettingActions.doRaise(activeSigner, BigInt(parsed)));
+                  void runAction(
+                    (activeSigner) => bettingActions.doRaise(activeSigner, BigInt(parsed)),
+                    { lockOnSuccess: true }
+                  );
                 }}
               >
                 Raise
@@ -909,16 +1158,26 @@ export function PokerGameplayPage() {
               <button
                 type="button"
                 className="games-wallet-link-btn danger"
-                disabled={!isMyTurn || !inBettingRound}
-                onClick={() => void runAction((activeSigner) => bettingActions.doAllIn(activeSigner))}
+                disabled={!isMyTurn || !inBettingRound || actionLocked}
+                onClick={() =>
+                  void runAction(
+                    (activeSigner) => bettingActions.doAllIn(activeSigner),
+                    { lockOnSuccess: true }
+                  )
+                }
               >
                 ALL-IN ({formatChips(myStack)})
               </button>
               <button
                 type="button"
                 className="games-wallet-link-btn"
-                disabled={!canStraddle}
-                onClick={() => void runAction((activeSigner) => bettingActions.doStraddle(activeSigner))}
+                disabled={!canStraddle || actionLocked}
+                onClick={() =>
+                  void runAction(
+                    (activeSigner) => bettingActions.doStraddle(activeSigner),
+                    { lockOnSuccess: true }
+                  )
+                }
               >
                 Straddle
               </button>
@@ -948,75 +1207,6 @@ export function PokerGameplayPage() {
           </section>
         )}
       </div>
-
-      {showAbortPanel && (
-        <div className="games-modal-backdrop">
-          <div className="games-wallet-modal">
-            <div className="games-wallet-modal-header">
-              <p className="m-0 games-wallet-modal-title">Abort Vote</p>
-              <button
-                type="button"
-                className="games-wallet-icon-btn games-wallet-icon-only"
-                onClick={() => setShowAbortPanel(false)}
-              >
-                ✕
-              </button>
-            </div>
-            <p className="m-0 games-wallet-modal-copy">
-              {abortVote.abortInProgress
-                ? `In progress • ${abortVote.approvalCount}/${abortVote.seatedCount} approvals`
-                : "No active abort vote"}
-            </p>
-            {abortVote.abortDeadline > 0 && (
-              <p className="m-0 games-wallet-modal-copy">
-                Deadline: {new Date(abortVote.abortDeadline * 1000).toLocaleTimeString()}
-              </p>
-            )}
-            <div className="games-wallet-modal-actions">
-              <button
-                type="button"
-                className="games-wallet-mini-btn"
-                onClick={() => void runAction((activeSigner) => abortVote.request(activeSigner))}
-                disabled={abortVote.abortInProgress}
-              >
-                Request
-              </button>
-              <button
-                type="button"
-                className="games-wallet-mini-btn"
-                onClick={() => void runAction((activeSigner) => abortVote.vote(activeSigner, true))}
-                disabled={!abortVote.abortInProgress}
-              >
-                Approve
-              </button>
-              <button
-                type="button"
-                className="games-wallet-mini-btn"
-                onClick={() => void runAction((activeSigner) => abortVote.vote(activeSigner, false))}
-                disabled={!abortVote.abortInProgress}
-              >
-                Veto
-              </button>
-              <button
-                type="button"
-                className="games-wallet-mini-btn games-wallet-mini-btn-accent"
-                disabled={!abortVote.canFinalize}
-                onClick={() => void runAction((activeSigner) => abortVote.finalize(activeSigner))}
-              >
-                Finalize
-              </button>
-              <button
-                type="button"
-                className="games-wallet-mini-btn games-wallet-mini-btn-danger"
-                onClick={() => void runAction((activeSigner) => abortVote.cancel(activeSigner))}
-                disabled={!abortVote.abortInProgress}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {showOwnerPanel && isAdmin && summary && (
         <div className="games-modal-backdrop">
@@ -1080,12 +1270,18 @@ export function PokerGameplayPage() {
                   <button
                     type="button"
                     className="games-wallet-owner-action danger"
-                    onClick={() => {
+                    onClick={async () => {
                       if (summary.hasActiveGame) {
                         pushToast("error", "Cannot close table during an active hand.");
                         return;
                       }
-                      void runAction((activeSigner) => ownerActions.doCloseTable(activeSigner));
+                      const closed = await runAction((activeSigner) =>
+                        ownerActions.doCloseTable(activeSigner)
+                      );
+                      if (closed) {
+                        await clearMessages();
+                        navigate("/games/poker", { replace: true });
+                      }
                     }}
                     disabled={summary.hasActiveGame}
                   >
@@ -1228,6 +1424,65 @@ export function PokerGameplayPage() {
           </div>
         </div>
       )}
+
+      <ChatPanel visible={showChat} onClose={() => setShowChat(false)} />
+
+      {summary && (
+        <JoinTableModal
+          visible={showJoinModal}
+          selectedSeat={joinSeat}
+          seats={seats}
+          minBuyIn={summary.minBuyIn}
+          maxBuyIn={summary.maxBuyIn}
+          userChipBalance={chipActions.chipBalance}
+          isPending={tableActions.pendingAction === "join"}
+          onClose={() => setShowJoinModal(false)}
+          onSelectedSeatChange={(seatIndex) => setJoinSeat(seatIndex)}
+          onJoin={async (seatIndex, buyInAmount) => {
+            setJoinBuyIn(String(buyInAmount));
+            await handleJoin(seatIndex, buyInAmount);
+          }}
+        />
+      )}
+
+      <ShowdownModal
+        visible={showdownData.visible}
+        handNumber={showdownData.handNumber}
+        resultType={showdownData.resultType}
+        totalPot={showdownData.totalPot}
+        communityCards={showdownData.communityCards}
+        winners={showdownData.winners}
+        showdownPlayers={showdownData.showdownPlayers}
+        playerProfiles={playerProfiles}
+        onClose={() => {
+          setShowdownData((current) => ({ ...current, visible: false }));
+          void poll();
+        }}
+      />
+
+      <AbortVoteModal
+        visible={showAbortPanel || abortVote.abortInProgress}
+        abortInProgress={abortVote.abortInProgress}
+        approvals={abortVote.approvalCount}
+        vetos={abortVote.vetoCount}
+        seatedCount={abortVote.seatedCount}
+        deadline={abortVote.abortDeadline}
+        canFinalize={abortVote.canFinalize}
+        isPending={abortVote.isPending}
+        onClose={() => setShowAbortPanel(false)}
+        onRequest={async () => {
+          await runAction((activeSigner) => abortVote.request(activeSigner));
+        }}
+        onVote={async (approve) => {
+          await runAction((activeSigner) => abortVote.vote(activeSigner, approve));
+        }}
+        onFinalize={async () => {
+          await runAction((activeSigner) => abortVote.finalize(activeSigner));
+        }}
+        onCancel={async () => {
+          await runAction((activeSigner) => abortVote.cancel(activeSigner));
+        }}
+      />
     </div>
   );
 }
