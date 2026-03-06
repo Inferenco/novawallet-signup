@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { WalletButton } from "@/components/wallet/WalletButton";
+import { CHAIN_CONFIG } from "@/config/chain";
 import { hasConfiguredGameContracts } from "@/config/env";
 import { useToast } from "@/providers/ToastProvider";
 import { useWallet } from "@/providers/WalletProvider";
@@ -11,6 +12,7 @@ import { useGameSigner } from "../hooks/useGameSigner";
 import { createTable } from "../services/poker/actions";
 import { formatChips } from "../services/poker/chips";
 import { usePokerTablesStore } from "../stores/poker/tables";
+import { getTableAddress } from "../services/poker/views";
 import { parsePokerError } from "../utils/poker/errors";
 import "../styles/poker-lobby.css";
 
@@ -19,13 +21,73 @@ function parseInteger(value: string): number {
   return Number.isFinite(parsed) ? parsed : Number.NaN;
 }
 
+async function resolveCreatedTableAddress(
+  network: ReturnType<typeof useGamesNetwork>,
+  ownerAddress: string,
+  attempts = 8
+): Promise<string | null> {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      const tableAddress = await getTableAddress(network, ownerAddress);
+      if (tableAddress && tableAddress !== "0x0") {
+        return tableAddress;
+      }
+    } catch {
+      // The table ref may not be visible immediately after transaction execution.
+    }
+
+    await new Promise((resolve) => window.setTimeout(resolve, 800));
+  }
+
+  return null;
+}
+
+async function resolveCreatedTableAddressFromTransaction(
+  transactionHash: string,
+  attempts = 8
+): Promise<string | null> {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      const response = await fetch(`${CHAIN_CONFIG.rpcUrl}/transactions/by_hash/${transactionHash}`);
+      if (response.ok) {
+        const payload = (await response.json()) as {
+          success?: boolean;
+          events?: Array<{ type?: string; data?: Record<string, unknown> }>;
+        };
+
+        if (payload.success) {
+          const createdEvent = payload.events?.find((event) =>
+            event.type?.endsWith("::poker_events::TableCreated")
+          );
+          const tableAddress = String(
+            createdEvent?.data?.table_addr ??
+              createdEvent?.data?.table_address ??
+              createdEvent?.data?.tableAddress ??
+              ""
+          ).trim();
+
+          if (tableAddress) {
+            return tableAddress;
+          }
+        }
+      }
+    } catch {
+      // Retry while the fullnode catches up with the submitted transaction.
+    }
+
+    await new Promise((resolve) => window.setTimeout(resolve, 500));
+  }
+
+  return null;
+}
+
 export function PokerCreatePage() {
   const wallet = useWallet();
   const signer = useGameSigner();
   const network = useGamesNetwork();
   const navigate = useNavigate();
   const { pushToast } = useToast();
-  const { refreshTables } = usePokerTablesStore();
+  const { refreshTables, setMyTable } = usePokerTablesStore();
 
   const [tableName, setTableName] = useState("");
   const [colorIndex, setColorIndex] = useState(0);
@@ -84,7 +146,7 @@ export function PokerCreatePage() {
 
     setSubmitting(true);
     try {
-      await createTable(network, signer, {
+      const transaction = await createTable(network, signer, {
         smallBlind: BigInt(parseInteger(smallBlind)),
         bigBlind: BigInt(parseInteger(bigBlind)),
         minBuyIn: BigInt(parseInteger(minBuyIn)),
@@ -96,8 +158,19 @@ export function PokerCreatePage() {
         colorIndex
       });
 
+      const createdTableAddress =
+        (await resolveCreatedTableAddressFromTransaction(transaction.hash)) ??
+        (await resolveCreatedTableAddress(network, signer.accountAddress));
+
       pushToast("success", "Table created successfully.");
-      await refreshTables(network);
+      void refreshTables(network);
+
+      if (createdTableAddress) {
+        setMyTable(createdTableAddress);
+        navigate(`/games/poker/${createdTableAddress}`);
+        return;
+      }
+
       navigate("/games/poker");
     } catch (error) {
       pushToast("error", parsePokerError(error));
