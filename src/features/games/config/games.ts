@@ -5,14 +5,15 @@ const FALLBACK_GAME_ADDRESS = "0x0";
 
 export const GAME_CONTRACTS: Record<NetworkType, {
   address: string;
-  modules: {
-    TEXAS_HOLDEM: string;
-    POKER_EVENTS: string;
-    HAND_EVAL: string;
-    POT_MANAGER: string;
-    CHIPS: string;
-    GAMES_TREASURY: string;
-  };
+    modules: {
+      TEXAS_HOLDEM: string;
+      POKER_EVENTS: string;
+      HAND_EVAL: string;
+      POT_MANAGER: string;
+      CHIPS: string;
+      GAMES_TREASURY: string;
+      GAMING_CONSENT: string;
+    };
 }> = {
   testnet: {
     address: CHAIN_CONFIG.gameContractAddress || FALLBACK_GAME_ADDRESS,
@@ -23,7 +24,8 @@ export const GAME_CONTRACTS: Record<NetworkType, {
         HAND_EVAL: `${this.address}::poker_hand_eval`,
         POT_MANAGER: `${this.address}::poker_pot_manager`,
         CHIPS: `${this.address}::chips`,
-        GAMES_TREASURY: `${this.address}::games_treasury`
+        GAMES_TREASURY: `${this.address}::games_treasury`,
+        GAMING_CONSENT: `${this.address}::gaming_consent`
       };
     }
   },
@@ -36,7 +38,8 @@ export const GAME_CONTRACTS: Record<NetworkType, {
         HAND_EVAL: `${this.address}::poker_hand_eval`,
         POT_MANAGER: `${this.address}::poker_pot_manager`,
         CHIPS: `${this.address}::chips`,
-        GAMES_TREASURY: `${this.address}::games_treasury`
+        GAMES_TREASURY: `${this.address}::games_treasury`,
+        GAMING_CONSENT: `${this.address}::gaming_consent`
       };
     }
   }

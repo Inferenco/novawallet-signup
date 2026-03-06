@@ -830,7 +830,7 @@ function PokerGameplayContent({ tableAddress }: PokerGameplayContentProps) {
 
         {!contractsReady && (
           <div className="games-wallet-config-warning">
-            Configure `VITE_GAME_CONTRACT_ADDRESS` and `VITE_GAMES_WALLET_CONTRACT_ADDRESS` to enable live transactions.
+            Configure `VITE_GAME_CONTRACT_ADDRESS` and `VITE_WALLET_CONTRACT_ADDRESS` to enable live transactions.
           </div>
         )}
 

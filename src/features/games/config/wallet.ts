@@ -11,26 +11,23 @@ export const WALLET_CONTRACTS: Record<
       EVENTS: string;
       USER_PROFILES: string;
       WALLET_TREASURY: string;
-      GAMING_CONSENT: string;
     };
   }
 > = {
   testnet: {
-    address: CHAIN_CONFIG.gamesWalletContractAddress || FALLBACK_WALLET_ADDRESS,
+    address: CHAIN_CONFIG.walletContractAddress || FALLBACK_WALLET_ADDRESS,
     modules: {
       EVENTS: "events",
       USER_PROFILES: "user_profiles",
-      WALLET_TREASURY: "wallet_treasury",
-      GAMING_CONSENT: "gaming_consent"
+      WALLET_TREASURY: "wallet_treasury"
     }
   },
   devnet: {
-    address: CHAIN_CONFIG.gamesWalletContractAddress || FALLBACK_WALLET_ADDRESS,
+    address: CHAIN_CONFIG.walletContractAddress || FALLBACK_WALLET_ADDRESS,
     modules: {
       EVENTS: "events",
       USER_PROFILES: "user_profiles",
-      WALLET_TREASURY: "wallet_treasury",
-      GAMING_CONSENT: "gaming_consent"
+      WALLET_TREASURY: "wallet_treasury"
     }
   }
 };

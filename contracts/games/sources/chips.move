@@ -14,7 +14,7 @@ module NovaWalletGames::chips {
     use cedra_std::table::{Self, Table};
     use NovaWalletGames::game_registry::{Self, GameCapability};
     use NovaWalletGames::games_treasury;
-    use wallet::gaming_consent;
+    use NovaWalletGames::gaming_consent;
 
     // Friend modules that can access internal chip functions
     friend NovaWalletGames::poker_texas_holdem;

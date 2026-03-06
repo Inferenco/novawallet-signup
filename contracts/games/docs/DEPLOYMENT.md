@@ -29,7 +29,8 @@ The CLI will output your new account address (e.g., `0xd287...`). You must fund 
 ## 2. Package Configuration
 
 Before deploying, you must set the `NovaWalletGames` named address in `Move.toml` to match your deployment account.
-Because `chips.move` now depends on `wallet::gaming_consent`, also ensure the `wallet` named address points to the deployed wallet package address.
+The games package is now self-contained for casino consent; `gaming_consent` is published as `NovaWalletGames::gaming_consent`.
+The separate wallet package is still used by the frontend for `wallet::user_profiles`, but it is not a Move dependency of `contracts/games`.
 
 1. detailed in `config.yaml` (or check CLI output).
 2. Open `contracts/games/Move.toml`.
@@ -38,7 +39,6 @@ Because `chips.move` now depends on `wallet::gaming_consent`, also ensure the `w
 ```toml
 [addresses]
 NovaWalletGames = "0xdac17287f4397d5b803390c0bd0db7354ec52bf9ed3bef5e2130d6e126b55bdd"
-wallet = "0xf23d1dafe928501a2c3cea8ef9b3c71522c5c576141c5b1d34a0b394e65f554e"
 ```
 
 ## 3. Deployment
@@ -48,10 +48,11 @@ Deploy the package using `{PACKAGE_NAME}`.
 ### Command
 ```bash
 cedra move publish \
+  --package-dir contracts/games \
   --profile GAMES_ADMIN_V4 \
   --override-size-check \
   --included-artifacts none \
-  --named-addresses NovaWalletGames=0xdac17287f4397d5b803390c0bd0db7354ec52bf9ed3bef5e2130d6e126b55bdd,wallet=0xf23d1dafe928501a2c3cea8ef9b3c71522c5c576141c5b1d34a0b394e65f554e \
+  --named-addresses NovaWalletGames=0xdac17287f4397d5b803390c0bd0db7354ec52bf9ed3bef5e2130d6e126b55bdd \
   --assume-yes
 ```
 
@@ -79,6 +80,7 @@ cedra move run \
 - Create Tables (`poker_texas_holdem::create_table`)
 - Register Games (`game_registry::register_game`)
 - Update Global Limits (`chips::update_global_max_table_buy_in`)
+- Update casino terms (`gaming_consent::set_terms`)
 - Governance (`chips::initiate_governance_action`)
 
 ### Contract Address Reference

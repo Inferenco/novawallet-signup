@@ -52,7 +52,7 @@ export function hasConfiguredGamesWalletContract(): boolean {
 }
 
 export function hasConfiguredGameContracts(): boolean {
-  return appEnv.gameContractAddress !== "0x0" && hasConfiguredGamesWalletContract();
+  return appEnv.gameContractAddress !== "0x0" && hasConfiguredWalletContract();
 }
 
 export function hasConfiguredSupabase(): boolean {

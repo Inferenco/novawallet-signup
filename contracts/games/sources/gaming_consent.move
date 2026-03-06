@@ -1,14 +1,14 @@
 /// Gaming Consent Module
 ///
-/// Stores a versioned casino-terms document at the wallet package address and
+/// Stores a versioned casino-terms document at the games package address and
 /// an on-chain acknowledgement record under each user account.
-module wallet::gaming_consent {
+module NovaWalletGames::gaming_consent {
     use std::error;
     use std::signer;
     use std::string::{Self, String};
     use cedra_framework::event;
     use cedra_framework::timestamp;
-    use wallet::wallet_treasury;
+    use NovaWalletGames::games_treasury;
 
     // ============================================
     // ERROR CODES
@@ -81,7 +81,7 @@ module wallet::gaming_consent {
 
     fun init_module(account: &signer) {
         // Keep publish/upgrade idempotent if module initialization is retried.
-        if (exists<TermsConfig>(@wallet)) return;
+        if (exists<TermsConfig>(@NovaWalletGames)) return;
 
         let now = timestamp::now_seconds();
         let terms_content = string::utf8(DEFAULT_TERMS_CONTENT);
@@ -100,20 +100,20 @@ module wallet::gaming_consent {
     // ============================================
 
     fun is_admin(addr: address): bool {
-        let primary = wallet_treasury::get_primary_admin();
+        let primary = games_treasury::get_primary_admin();
         if (primary != @0x0) {
             if (primary == addr) return true;
 
-            let secondary = wallet_treasury::get_secondary_admin();
+            let secondary = games_treasury::get_secondary_admin();
             if (secondary != @0x0 && secondary == addr) return true;
 
-            let tertiary = wallet_treasury::get_tertiary_admin();
+            let tertiary = games_treasury::get_tertiary_admin();
             if (tertiary != @0x0 && tertiary == addr) return true;
 
             return false
         };
 
-        addr == @wallet
+        addr == @NovaWalletGames
     }
 
     // ============================================
@@ -127,7 +127,7 @@ module wallet::gaming_consent {
         terms_content: String,
         terms_format: String,
     ) acquires TermsConfig {
-        assert!(exists<TermsConfig>(@wallet), error::not_found(E_NOT_INITIALIZED));
+        assert!(exists<TermsConfig>(@NovaWalletGames), error::not_found(E_NOT_INITIALIZED));
 
         let admin_addr = signer::address_of(admin);
         assert!(is_admin(admin_addr), error::permission_denied(E_NOT_ADMIN));
@@ -139,7 +139,7 @@ module wallet::gaming_consent {
         assert!(format_len > 0, error::invalid_argument(E_EMPTY_TERMS_FORMAT));
         assert!(format_len <= MAX_TERMS_FORMAT_LENGTH, error::invalid_argument(E_TERMS_FORMAT_TOO_LONG));
 
-        let config = borrow_global_mut<TermsConfig>(@wallet);
+        let config = borrow_global_mut<TermsConfig>(@NovaWalletGames);
         config.current_version = config.current_version + 1;
         config.terms_content = copy terms_content;
         config.terms_format = copy terms_format;
@@ -156,11 +156,11 @@ module wallet::gaming_consent {
     /// Acknowledge the currently active terms version.
     /// One acknowledgment is allowed per version.
     public entry fun acknowledge_current_terms(user: &signer) acquires TermsConfig, UserAcknowledgment {
-        assert!(exists<TermsConfig>(@wallet), error::not_found(E_NOT_INITIALIZED));
+        assert!(exists<TermsConfig>(@NovaWalletGames), error::not_found(E_NOT_INITIALIZED));
 
         let now = timestamp::now_seconds();
         let user_addr = signer::address_of(user);
-        let current_version = borrow_global<TermsConfig>(@wallet).current_version;
+        let current_version = borrow_global<TermsConfig>(@NovaWalletGames).current_version;
 
         if (exists<UserAcknowledgment>(user_addr)) {
             let ack = borrow_global_mut<UserAcknowledgment>(user_addr);
@@ -190,11 +190,11 @@ module wallet::gaming_consent {
 
     #[view]
     public fun get_current_terms(): (u64, String, String, u64) acquires TermsConfig {
-        if (!exists<TermsConfig>(@wallet)) {
+        if (!exists<TermsConfig>(@NovaWalletGames)) {
             return (0, string::utf8(b""), string::utf8(b""), 0)
         };
 
-        let config = borrow_global<TermsConfig>(@wallet);
+        let config = borrow_global<TermsConfig>(@NovaWalletGames);
         (
             config.current_version,
             config.terms_content,
@@ -205,10 +205,10 @@ module wallet::gaming_consent {
 
     #[view]
     public fun has_acknowledged_current(user: address): bool acquires TermsConfig, UserAcknowledgment {
-        if (!exists<TermsConfig>(@wallet)) return false;
+        if (!exists<TermsConfig>(@NovaWalletGames)) return false;
         if (!exists<UserAcknowledgment>(user)) return false;
 
-        let current_version = borrow_global<TermsConfig>(@wallet).current_version;
+        let current_version = borrow_global<TermsConfig>(@NovaWalletGames).current_version;
         borrow_global<UserAcknowledgment>(user).accepted_version >= current_version
     }
 
@@ -225,8 +225,8 @@ module wallet::gaming_consent {
 
     #[view]
     public fun get_current_terms_version(): u64 acquires TermsConfig {
-        if (!exists<TermsConfig>(@wallet)) return 0;
-        borrow_global<TermsConfig>(@wallet).current_version
+        if (!exists<TermsConfig>(@NovaWalletGames)) return 0;
+        borrow_global<TermsConfig>(@NovaWalletGames).current_version
     }
 
     #[test_only]

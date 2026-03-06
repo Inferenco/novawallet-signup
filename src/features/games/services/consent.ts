@@ -1,5 +1,5 @@
 import { getCedraClient } from "../core/transactions";
-import { buildWalletFunctionId } from "../config/wallet";
+import { buildFunctionId } from "../config/games";
 import type { NetworkType } from "../utils/constants";
 
 export { acknowledgeCurrentTerms } from "./consent/actions";
@@ -37,7 +37,7 @@ export async function getCurrentTerms(
   network: NetworkType
 ): Promise<CasinoTerms | null> {
   const cedra = getCedraClient(network);
-  const functionId = buildWalletFunctionId(
+  const functionId = buildFunctionId(
     network,
     "GAMING_CONSENT",
     "get_current_terms"
@@ -69,7 +69,7 @@ export async function hasAcknowledgedCurrent(
   userAddress: string
 ): Promise<boolean> {
   const cedra = getCedraClient(network);
-  const functionId = buildWalletFunctionId(
+  const functionId = buildFunctionId(
     network,
     "GAMING_CONSENT",
     "has_acknowledged_current"
@@ -96,7 +96,7 @@ export async function getUserAcknowledgment(
   userAddress: string
 ): Promise<UserTermsAcknowledgment | null> {
   const cedra = getCedraClient(network);
-  const functionId = buildWalletFunctionId(
+  const functionId = buildFunctionId(
     network,
     "GAMING_CONSENT",
     "get_user_acknowledgment"

@@ -11,6 +11,7 @@ This document is a **ground‑up, comprehensive rewrite** of the on‑chain Move
 **Game & platform modules**
 - `NovaWalletGames::poker_texas_holdem` — the Texas Hold’em game engine (tables, hands, betting, escrow)
 - `NovaWalletGames::chips` — internal, non‑transferable chip ledger + economy controls
+- `NovaWalletGames::gaming_consent` — on-chain casino terms versioning and per-user acknowledgments
 - `NovaWalletGames::game_registry` — capability‑based registry for new games
 - `NovaWalletGames::core_events` — generic events for any game
 - `NovaWalletGames::core_stats` — cross‑game player stats
@@ -559,8 +560,9 @@ sequenceDiagram
 
 ## 17) User Profiles (Optional, Wallet Package)
 
-Profiles are no longer hosted in the games package.
-Use `wallet::user_profiles` in `contracts/wallet`.
+Profiles are not hosted in the games package.
+Casino consent is hosted in this package as `NovaWalletGames::gaming_consent`.
+User profile metadata remains in the separate wallet package under `wallet::user_profiles`.
 
 **Wallet Entry**
 - `wallet::user_profiles::set_profile(account, nickname, avatar_url)`

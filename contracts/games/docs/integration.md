@@ -15,7 +15,8 @@ This is a **from‑scratch, exhaustive integration guide** for frontends connect
 You will need:
 - `contractAddress`
 - game module names (e.g., `poker_texas_holdem`, `chips`, `poker_events`)
-- wallet profile module: `wallet::user_profiles`
+- games consent module: `NovaWalletGames::gaming_consent`
+- wallet profile module: `wallet::user_profiles` in the separate wallet package
 
 ---
 
@@ -69,6 +70,11 @@ You need three components:
 ## 4) Chip Economy Integration (Wallet Balance)
 
 The chip ledger is **internal** (not a fungible token). Users cannot transfer chips directly; only the game can move chips internally.
+
+Casino rewards are gated by the games package consent module. Before claiming free chips or buying multipliers, the frontend should:
+- fetch current terms from `NovaWalletGames::gaming_consent`
+- check `has_acknowledged_current(user_addr)`
+- submit `acknowledge_current_terms` when needed
 
 ### 4.1 Entry Functions
 - `chips::purchase_multiplier(player, factor)`

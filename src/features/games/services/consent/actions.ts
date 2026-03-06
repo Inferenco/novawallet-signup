@@ -1,5 +1,5 @@
 import { submitFunctionTransaction } from "../../core/transactions";
-import { buildWalletFunctionId } from "../../config/wallet";
+import { buildFunctionId } from "../../config/games";
 import type { GameSigner } from "../../types";
 import type { NetworkType } from "../../utils/constants";
 
@@ -12,7 +12,7 @@ export async function acknowledgeCurrentTerms(
   network: NetworkType,
   signer: GameSigner
 ): Promise<ConsentTransactionResult> {
-  const functionId = buildWalletFunctionId(
+  const functionId = buildFunctionId(
     network,
     "GAMING_CONSENT",
     "acknowledge_current_terms"

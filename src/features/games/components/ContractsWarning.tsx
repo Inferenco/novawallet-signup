@@ -8,10 +8,8 @@ export function ContractsWarning() {
   if (appEnv.gameContractAddress === "0x0") {
     missing.push("`VITE_GAME_CONTRACT_ADDRESS`");
   }
-  if (appEnv.gamesWalletContractAddress === "0x0") {
-    missing.push(
-      "`VITE_WALLET_CONTRACT_ADDRESS` (or `VITE_GAMES_WALLET_CONTRACT_ADDRESS`)"
-    );
+  if (appEnv.walletContractAddress === "0x0") {
+    missing.push("`VITE_WALLET_CONTRACT_ADDRESS`");
   }
 
   return (
