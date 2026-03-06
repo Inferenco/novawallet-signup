@@ -150,7 +150,7 @@ export const usePokerTableStore = create<ActiveTableState>((set, get) => ({
     },
 
     refreshTableData: async (playerAddress?: string) => {
-        const { tableAddress, network } = get();
+        const { tableAddress, network, summary, lastRefresh } = get();
         if (!tableAddress || !network) return;
 
         set({ isRefreshing: true, error: null });
@@ -192,12 +192,15 @@ export const usePokerTableStore = create<ActiveTableState>((set, get) => ({
             }
         } catch (error: any) {
             const msg = error?.message || String(error);
+            const hasLoadedTableBefore = Boolean(summary || lastRefresh);
             // Check for specific "Table Closed" errors:
             // 1. VMError with ABORTED status
-            // 2. VMError with MISSING_DATA status (Failed to borrow global resource)
-            const isTableClosed =
-                (msg.includes('VMError') && msg.includes('ABORTED')) ||
-                (msg.includes('MISSING_DATA') && msg.includes('Failed to borrow global resource'));
+            // 2. MISSING_DATA after the table has already been loaded once
+            const isAbortedTableError =
+                msg.includes('VMError') && msg.includes('ABORTED');
+            const isMissingTableResource =
+                msg.includes('MISSING_DATA') && msg.includes('Failed to borrow global resource');
+            const isTableClosed = isAbortedTableError || (isMissingTableResource && hasLoadedTableBefore);
 
             if (isTableClosed) {
                 set({
@@ -212,7 +215,7 @@ export const usePokerTableStore = create<ActiveTableState>((set, get) => ({
             set({
                 isLoading: false,
                 isRefreshing: false,
-                error: 'Failed to load table data',
+                error: isMissingTableResource ? 'Table is still initializing…' : 'Failed to load table data',
             });
         }
     },

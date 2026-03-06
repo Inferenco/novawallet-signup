@@ -12,6 +12,7 @@ import { useGamesNetwork } from "../hooks/useGamesNetwork";
 import { useChipActions } from "../hooks/poker/useChipActions";
 import { getProfiles, type UserProfile } from "../services/profiles";
 import { formatChips } from "../services/poker/chips";
+import { getTableAddress, getTableSummary } from "../services/poker/views";
 import { buildChipBalanceKey, usePokerChipsStore } from "../stores/poker/chips";
 import { usePokerTablesStore } from "../stores/poker/tables";
 import "../styles/casino.css";
@@ -47,7 +48,8 @@ export function PokerLandingPage() {
   const { pushToast } = useToast();
   const address = wallet.account?.address?.toString() ?? "";
   const { balance: cedraBalance, refreshBalance: refreshCedraBalance } = useCedraBalance(address);
-  const { tables, refreshTables, isLoading } = usePokerTablesStore();
+  const { tables, refreshTables, isLoading, setMyTable, upsertTable, removeTable } =
+    usePokerTablesStore();
   const chipActions = useChipActions({ network, playerAddress: address });
   const { refreshBalance: refreshChipBalance } = chipActions;
 
@@ -68,6 +70,10 @@ export function PokerLandingPage() {
 
   const [joinAddress, setJoinAddress] = useState("");
   const [adminProfiles, setAdminProfiles] = useState<Map<string, UserProfile | null>>(new Map());
+  const existingOwnedTableAddress = useMemo(() => {
+    const normalized = address.toLowerCase();
+    return tables.find((table) => table.owner.toLowerCase() === normalized)?.tableAddress ?? null;
+  }, [address, tables]);
 
   useEffect(() => {
     if (!wallet.connected) return;
@@ -76,6 +82,38 @@ export function PokerLandingPage() {
     void refreshChipBalance();
     void refreshCedraBalance();
   }, [network, refreshCedraBalance, refreshChipBalance, refreshTables, wallet.connected]);
+
+  useEffect(() => {
+    if (!wallet.connected || !address) return;
+
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const tableAddress = await getTableAddress(network, address);
+        if (!tableAddress || tableAddress === "0x0" || cancelled) {
+          return;
+        }
+
+        const summary = await getTableSummary(network, tableAddress);
+        if (cancelled) return;
+
+        upsertTable({ ...summary, tableAddress });
+        setMyTable(tableAddress);
+      } catch {
+        if (!cancelled) {
+          setMyTable(null);
+          if (existingOwnedTableAddress) {
+            removeTable(existingOwnedTableAddress);
+          }
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [address, existingOwnedTableAddress, network, removeTable, setMyTable, upsertTable, wallet.connected]);
 
   useEffect(() => {
     if (!wallet.connected || tables.length === 0) return;

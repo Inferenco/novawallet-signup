@@ -36,6 +36,8 @@ interface PokerTablesState {
     setFilter: (filter: TableFilter) => void;
     setSearchQuery: (query: string) => void;
     setMyTable: (address: string | null) => void;
+    upsertTable: (table: DiscoveredTable) => void;
+    removeTable: (tableAddress: string) => void;
     clearError: () => void;
     reset: () => void;
 }
@@ -119,6 +121,29 @@ export const usePokerTablesStore = create<PokerTablesState>((set, get) => ({
 
     setMyTable: (address: string | null) => {
         set({ myTableAddress: address });
+    },
+
+    upsertTable: (table: DiscoveredTable) => {
+        set((state) => {
+            const nextTables = [...state.tables];
+            const index = nextTables.findIndex((entry) => entry.tableAddress === table.tableAddress);
+
+            if (index >= 0) {
+                nextTables[index] = table;
+            } else {
+                nextTables.unshift(table);
+            }
+
+            return { tables: nextTables };
+        });
+    },
+
+    removeTable: (tableAddress: string) => {
+        set((state) => ({
+            tables: state.tables.filter((table) => table.tableAddress !== tableAddress),
+            myTableAddress:
+                state.myTableAddress === tableAddress ? null : state.myTableAddress
+        }));
     },
 
     clearError: () => {

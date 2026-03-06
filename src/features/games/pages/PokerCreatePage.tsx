@@ -11,6 +11,7 @@ import { useGamesNetwork } from "../hooks/useGamesNetwork";
 import { useGameSigner } from "../hooks/useGameSigner";
 import { createTable } from "../services/poker/actions";
 import { formatChips } from "../services/poker/chips";
+import { getTableSummary } from "../services/poker/views";
 import { usePokerTablesStore } from "../stores/poker/tables";
 import { getTableAddress } from "../services/poker/views";
 import { parsePokerError } from "../utils/poker/errors";
@@ -29,7 +30,11 @@ async function resolveCreatedTableAddress(
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     try {
       const tableAddress = await getTableAddress(network, ownerAddress);
-      if (tableAddress && tableAddress !== "0x0") {
+      if (
+        tableAddress &&
+        tableAddress !== "0x0" &&
+        (await canLoadTableSummary(network, tableAddress))
+      ) {
         return tableAddress;
       }
     } catch {
@@ -42,7 +47,20 @@ async function resolveCreatedTableAddress(
   return null;
 }
 
+async function canLoadTableSummary(
+  network: ReturnType<typeof useGamesNetwork>,
+  tableAddress: string
+): Promise<boolean> {
+  try {
+    await getTableSummary(network, tableAddress);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function resolveCreatedTableAddressFromTransaction(
+  network: ReturnType<typeof useGamesNetwork>,
   transactionHash: string,
   attempts = 8
 ): Promise<string | null> {
@@ -66,7 +84,7 @@ async function resolveCreatedTableAddressFromTransaction(
               ""
           ).trim();
 
-          if (tableAddress) {
+          if (tableAddress && (await canLoadTableSummary(network, tableAddress))) {
             return tableAddress;
           }
         }
@@ -87,7 +105,7 @@ export function PokerCreatePage() {
   const network = useGamesNetwork();
   const navigate = useNavigate();
   const { pushToast } = useToast();
-  const { refreshTables, setMyTable } = usePokerTablesStore();
+  const { refreshTables, setMyTable, upsertTable } = usePokerTablesStore();
 
   const [tableName, setTableName] = useState("");
   const [colorIndex, setColorIndex] = useState(0);
@@ -159,13 +177,19 @@ export function PokerCreatePage() {
       });
 
       const createdTableAddress =
-        (await resolveCreatedTableAddressFromTransaction(transaction.hash)) ??
+        (await resolveCreatedTableAddressFromTransaction(network, transaction.hash)) ??
         (await resolveCreatedTableAddress(network, signer.accountAddress));
 
       pushToast("success", "Table created successfully.");
       void refreshTables(network);
 
       if (createdTableAddress) {
+        try {
+          const summary = await getTableSummary(network, createdTableAddress);
+          upsertTable({ ...summary, tableAddress: createdTableAddress });
+        } catch {
+          // Background discovery can still fill this in if summary is briefly unavailable.
+        }
         setMyTable(createdTableAddress);
         navigate(`/games/poker/${createdTableAddress}`);
         return;

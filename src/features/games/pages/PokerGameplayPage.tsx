@@ -20,6 +20,7 @@ import {
   useNeedsCommit,
   useNeedsReveal
 } from "../stores/poker/table";
+import { usePokerTablesStore } from "../stores/poker/tables";
 import { useCommitReveal } from "../hooks/poker/useCommitReveal";
 import { useBettingActions } from "../hooks/poker/useBettingActions";
 import { useTableActions } from "../hooks/poker/useTableActions";
@@ -118,6 +119,7 @@ function PokerGameplayContent({ tableAddress }: PokerGameplayContentProps) {
   const { unreadCount, clearMessages, setIsTableOwner } = useChatContext();
   const address = wallet.account?.address?.toString() ?? "";
   const contractsReady = hasConfiguredGameContracts();
+  const { removeTable, setMyTable } = usePokerTablesStore();
 
   const {
     setActiveTable,
@@ -137,6 +139,7 @@ function PokerGameplayContent({ tableAddress }: PokerGameplayContentProps) {
     commitDeadline,
     revealDeadline,
     error,
+    clearError,
     reset
   } = usePokerTableStore();
 
@@ -169,6 +172,7 @@ function PokerGameplayContent({ tableAddress }: PokerGameplayContentProps) {
   const [newMaxBuyIn, setNewMaxBuyIn] = useState("");
   const [nowMs, setNowMs] = useState(0);
   const [failedAvatarUrls, setFailedAvatarUrls] = useState<Set<string>>(new Set());
+  const [routeReadyForErrors, setRouteReadyForErrors] = useState(false);
   const [showdownData, setShowdownData] = useState<ShowdownState>({
     visible: false,
     winners: [],
@@ -253,14 +257,18 @@ function PokerGameplayContent({ tableAddress }: PokerGameplayContentProps) {
   });
 
   useEffect(() => {
+    setRouteReadyForErrors(false);
+    clearError();
     if (!tableAddress || !contractsReady) return;
     setActiveTable(tableAddress, network);
     void refreshTableData(address || undefined);
+    setRouteReadyForErrors(true);
 
     return () => {
+      setRouteReadyForErrors(false);
       reset();
     };
-  }, [address, contractsReady, network, refreshTableData, reset, setActiveTable, tableAddress]);
+  }, [address, clearError, contractsReady, network, refreshTableData, reset, setActiveTable, tableAddress]);
 
   useEffect(() => {
     if (!wallet.connected || !address) return;
@@ -321,11 +329,12 @@ function PokerGameplayContent({ tableAddress }: PokerGameplayContentProps) {
   }, [isMyTurn, needsCommit, needsReveal, setUrgent]);
 
   useEffect(() => {
-    if (error === "TABLE_CLOSED") {
+    if (routeReadyForErrors && error === "TABLE_CLOSED") {
+      clearError();
       pushToast("info", "This table was closed.");
       navigate("/games/poker", { replace: true });
     }
-  }, [error, navigate, pushToast]);
+  }, [clearError, error, navigate, pushToast, routeReadyForErrors]);
 
   useEffect(() => {
     if (!actionLocked) return;
@@ -1279,6 +1288,10 @@ function PokerGameplayContent({ tableAddress }: PokerGameplayContentProps) {
                         ownerActions.doCloseTable(activeSigner)
                       );
                       if (closed) {
+                        if (tableAddress) {
+                          removeTable(tableAddress);
+                          setMyTable(null);
+                        }
                         await clearMessages();
                         navigate("/games/poker", { replace: true });
                       }

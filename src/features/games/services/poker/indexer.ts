@@ -60,6 +60,8 @@ export interface DiscoveredTable extends TableSummary {
 // ============================================================================
 
 const GRAPHQL_ENDPOINT = CHAIN_CONFIG.gamesIndexerUrl;
+const STALE_TABLE_TTL_MS = 60_000;
+const staleTableAddresses = new Map<string, number>();
 
 interface GraphQLResponse<T> {
     data?: T;
@@ -78,8 +80,6 @@ async function queryIndexer<T>(
     }
 
     try {
-        console.log('[Indexer] Querying with variables:', JSON.stringify(variables, null, 2));
-
         const response = await fetch(GRAPHQL_ENDPOINT, {
             method: 'POST',
             headers: {
@@ -94,8 +94,6 @@ async function queryIndexer<T>(
             console.error('[Indexer] GraphQL errors:', result.errors);
             return null;
         }
-
-        console.log('[Indexer] Response data:', JSON.stringify(result.data, null, 2).slice(0, 500));
 
         return result.data ?? null;
     } catch (error) {
@@ -112,10 +110,30 @@ function getEventTypeVariants(contractAddress: string, eventName: string): strin
     const normalized = normalizeAddress(contractAddress);
     const padded = '0x' + contractAddress.slice(2).padStart(64, '0');
 
-    return [
+    return [...new Set([
         `${normalized}::poker_events::${eventName}`,
         `${padded}::poker_events::${eventName}`,
-    ];
+    ])];
+}
+
+function pruneStaleTableCache(now = Date.now()) {
+    staleTableAddresses.forEach((timestamp, address) => {
+        if (now - timestamp > STALE_TABLE_TTL_MS) {
+            staleTableAddresses.delete(address);
+        }
+    });
+}
+
+function isMissingTableError(error: unknown): boolean {
+    const message = error instanceof Error ? error.message : String(error ?? '');
+    return (
+        message.includes('get_table_summary') &&
+        (
+            message.includes('MISSING_DATA') ||
+            message.includes('ABORTED') ||
+            message.includes('sub_status: Some(3)')
+        )
+    );
 }
 
 // ============================================================================
@@ -305,6 +323,8 @@ export async function discoverActiveTables(
     network: NetworkType,
     limit: number = 20
 ): Promise<DiscoveredTable[]> {
+    pruneStaleTableCache();
+
     // Fetch created and closed events (fetch more to account for filtering)
     const [created, closed] = await Promise.all([
         fetchTableCreatedEvents(network, limit * 3),
@@ -317,6 +337,7 @@ export async function discoverActiveTables(
     // Filter to active tables (created but not closed)
     const activeAddresses = created
         .filter(e => !closedSet.has(e.tableAddress))
+        .filter(e => !staleTableAddresses.has(e.tableAddress))
         .map(e => e.tableAddress);
 
     // Deduplicate
@@ -334,7 +355,12 @@ export async function discoverActiveTables(
                 tableAddress: address,
             };
         } catch (error) {
-            // Table might have been closed or invalid, skip it
+            // The indexer can lag behind closures; avoid hammering known-missing tables.
+            if (isMissingTableError(error)) {
+                staleTableAddresses.set(address, Date.now());
+                return null;
+            }
+
             console.warn(`Failed to fetch summary for ${address}:`, error);
             return null;
         }
