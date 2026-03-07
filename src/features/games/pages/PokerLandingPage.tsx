@@ -48,7 +48,7 @@ export function PokerLandingPage() {
   const { pushToast } = useToast();
   const address = wallet.account?.address?.toString() ?? "";
   const { balance: cedraBalance, refreshBalance: refreshCedraBalance } = useCedraBalance(address);
-  const { tables, refreshTables, isLoading, setMyTable, upsertTable, removeTable } =
+  const { tables, refreshTables, isLoading, lastRefresh, setMyTable, upsertTable, removeTable } =
     usePokerTablesStore();
   const chipActions = useChipActions({ network, playerAddress: address });
   const { refreshBalance: refreshChipBalance } = chipActions;
@@ -113,7 +113,16 @@ export function PokerLandingPage() {
     return () => {
       cancelled = true;
     };
-  }, [address, existingOwnedTableAddress, network, removeTable, setMyTable, upsertTable, wallet.connected]);
+  }, [
+    address,
+    existingOwnedTableAddress,
+    lastRefresh,
+    network,
+    removeTable,
+    setMyTable,
+    upsertTable,
+    wallet.connected
+  ]);
 
   useEffect(() => {
     if (!wallet.connected || tables.length === 0) return;

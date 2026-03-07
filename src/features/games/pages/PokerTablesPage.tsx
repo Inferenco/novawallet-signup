@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { useWallet } from "@/providers/WalletProvider";
 import { GamesTopBar } from "../components/GamesTopBar";
 import { TABLE_COLORS } from "../config/games";
 import { useGamesNetwork } from "../hooks/useGamesNetwork";
 import { getProfiles, type UserProfile } from "../services/profiles";
+import { getTableAddress, getTableSummary } from "../services/poker/views";
 import { useFilteredTables, usePokerTablesStore } from "../stores/poker/tables";
 import "../styles/casino.css";
 import "../styles/poker-lobby.css";
@@ -31,6 +33,8 @@ function TableAvatar({
 
 export function PokerTablesPage() {
   const network = useGamesNetwork();
+  const wallet = useWallet();
+  const address = wallet.account?.address?.toString() ?? "";
   const {
     refreshTables,
     isLoading,
@@ -39,7 +43,10 @@ export function PokerTablesPage() {
     setSearchQuery,
     hasMore,
     loadMoreTables,
-    isLoadingMore
+    isLoadingMore,
+    lastRefresh,
+    setMyTable,
+    upsertTable
   } = usePokerTablesStore();
   const filteredTables = useFilteredTables();
   const [adminProfiles, setAdminProfiles] = useState<Map<string, UserProfile | null>>(new Map());
@@ -47,6 +54,38 @@ export function PokerTablesPage() {
   useEffect(() => {
     void refreshTables(network, 20);
   }, [network, refreshTables]);
+
+  useEffect(() => {
+    if (!wallet.connected || !address) return;
+
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const tableAddress = await getTableAddress(network, address);
+        if (!tableAddress || tableAddress === "0x0" || cancelled) {
+          if (!cancelled) {
+            setMyTable(null);
+          }
+          return;
+        }
+
+        const summary = await getTableSummary(network, tableAddress);
+        if (cancelled) return;
+
+        upsertTable({ ...summary, tableAddress });
+        setMyTable(tableAddress);
+      } catch {
+        if (!cancelled) {
+          setMyTable(null);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [address, lastRefresh, network, setMyTable, upsertTable, wallet.connected]);
 
   useEffect(() => {
     if (filteredTables.length === 0) return;

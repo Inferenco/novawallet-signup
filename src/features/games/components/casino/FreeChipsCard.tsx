@@ -83,7 +83,9 @@ export function FreeChipsCard({
         </span>
       </div>
       <p className="games-casino-stat-value games-casino-stat-value-chip" style={{ margin: 0 }}>
-        <img src={CHIP_IMAGE_URL} alt="" aria-hidden="true" />
+        <span className="games-casino-chip-badge" aria-hidden="true">
+          <img src={CHIP_IMAGE_URL} alt="" />
+        </span>
         <span>{claimsDisabled ? "Free claims disabled" : `${formatChips(displayAmount)} chips`}</span>
       </p>
       {hasBoost ? (

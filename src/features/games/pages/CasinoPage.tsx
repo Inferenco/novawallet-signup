@@ -28,6 +28,13 @@ function isTermsError(message: string | null | undefined): boolean {
   return safe.includes("terms") || safe.includes("acknowledge") || safe.includes("casino");
 }
 
+function formatCedraCompact(balance: number): string {
+  const raw = formatCedraFromOctas(BigInt(Math.max(balance, 0))).replace(/\s+CEDRA$/, "");
+  const [whole, decimal = ""] = raw.split(".");
+  const trimmed = decimal.slice(0, 3).replace(/0+$/, "");
+  return trimmed ? `${whole}.${trimmed}` : whole;
+}
+
 export function CasinoPage() {
   const wallet = useWallet();
   const signer = useGameSigner();
@@ -252,10 +259,7 @@ export function CasinoPage() {
 
     return `${chipActions.multiplierStatus.factor}x active`;
   }, [chipActions.multiplierStatus.factor, chipActions.multiplierStatus.isActive]);
-  const cedraDisplay = useMemo(
-    () => formatCedraFromOctas(BigInt(Math.max(cedraBalance, 0))).replace(/\s+CEDRA$/, ""),
-    [cedraBalance]
-  );
+  const cedraDisplay = useMemo(() => formatCedraCompact(cedraBalance), [cedraBalance]);
 
   if (!wallet.connected) {
     return (
@@ -334,7 +338,9 @@ export function CasinoPage() {
                 <div className="games-casino-stat-card">
                   <p className="games-casino-stat-label">Chip Wallet</p>
                   <p className="games-casino-stat-value games-casino-stat-value-chip">
-                    <img src={CHIP_IMAGE_URL} alt="" aria-hidden="true" />
+                    <span className="games-casino-chip-badge" aria-hidden="true">
+                      <img src={CHIP_IMAGE_URL} alt="" />
+                    </span>
                     <span>{formatChips(chipActions.chipBalance)}</span>
                   </p>
                 </div>
@@ -343,7 +349,9 @@ export function CasinoPage() {
               <p className="games-casino-disclaimer">
                 {boostSummary}. Current boosted claim:{" "}
                 <span className="games-casino-chip-inline">
-                  <img src={CHIP_IMAGE_URL} alt="" aria-hidden="true" />
+                  <span className="games-casino-chip-badge" aria-hidden="true">
+                    <img src={CHIP_IMAGE_URL} alt="" />
+                  </span>
                   {formatChips(freeChips.boostedDailyAmount)} chips
                 </span>
                 .
@@ -356,18 +364,25 @@ export function CasinoPage() {
                 <h2 className="games-section-title">Live Tables</h2>
               </div>
 
-              <div className="games-casino-game-row">
-                <img
-                  className="games-casino-game-icon"
-                  src="/assets/casino/game-icon.png"
-                  alt="Poker"
-                />
-                <div className="games-casino-game-meta">
-                  <p className="games-casino-game-title">Texas Hold&apos;em</p>
-                  <p className="games-casino-game-copy">
-                    Use your chip balance to join direct tables, browse active rooms, or host your
-                    own.
-                  </p>
+              <div className="games-casino-live-tile">
+                <div className="games-casino-live-head">
+                  <img
+                    className="games-casino-game-icon"
+                    src="/assets/casino/game-icon.png"
+                    alt="Poker"
+                  />
+                  <div className="games-casino-game-meta">
+                    <p className="games-casino-game-title">Texas Hold&apos;em</p>
+                    <p className="games-casino-game-copy">
+                      Join direct tables, browse active rooms, or host your own from a cleaner
+                      poker floor.
+                    </p>
+                  </div>
+                </div>
+                <div className="games-casino-live-points">
+                  <span>Live lobby access</span>
+                  <span>Owner-hosted tables</span>
+                  <span>Chip-funded play</span>
                 </div>
                 <Link className="games-button-link games-button-link-primary" to="/games/poker">
                   Enter
