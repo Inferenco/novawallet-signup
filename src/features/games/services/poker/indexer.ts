@@ -61,6 +61,8 @@ export interface DiscoveredTable extends TableSummary {
 
 const GRAPHQL_ENDPOINT = CHAIN_CONFIG.gamesIndexerUrl;
 const STALE_TABLE_TTL_MS = 60_000;
+const INDEXER_REQUEST_TIMEOUT_MS = 8_000;
+const INDEXER_EVENT_BATCH_LIMIT = 6;
 const staleTableAddresses = new Map<string, number>();
 
 interface GraphQLResponse<T> {
@@ -80,23 +82,34 @@ async function queryIndexer<T>(
     }
 
     try {
-        const response = await fetch(GRAPHQL_ENDPOINT, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ query, variables }),
-        });
+        const controller = new AbortController();
+        const timeout = globalThis.setTimeout(() => controller.abort(), INDEXER_REQUEST_TIMEOUT_MS);
+        try {
+            const response = await fetch(GRAPHQL_ENDPOINT, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ query, variables }),
+                signal: controller.signal,
+            });
 
-        const result: GraphQLResponse<T> = await response.json();
+            const result: GraphQLResponse<T> = await response.json();
 
-        if (result.errors) {
-            console.error('[Indexer] GraphQL errors:', result.errors);
+            if (result.errors) {
+                console.error('[Indexer] GraphQL errors:', result.errors);
+                return null;
+            }
+
+            return result.data ?? null;
+        } finally {
+            globalThis.clearTimeout(timeout);
+        }
+    } catch (error) {
+        if (error instanceof Error && error.name === 'AbortError') {
+            console.warn('[Indexer] Query timed out:', { endpoint: GRAPHQL_ENDPOINT, variables });
             return null;
         }
-
-        return result.data ?? null;
-    } catch (error) {
         console.error('[Indexer] Query failed:', error);
         return null;
     }
@@ -149,6 +162,7 @@ export async function fetchTableCreatedEvents(
 ): Promise<TableCreatedEvent[]> {
     const contract = getGameContract(network);
     const eventTypes = getEventTypeVariants(contract.address, 'TableCreated');
+    const safeLimit = Math.min(limit, INDEXER_EVENT_BATCH_LIMIT);
 
     const query = `
         query FetchTableCreated($eventTypes: [String!], $limit: Int) {
@@ -166,7 +180,7 @@ export async function fetchTableCreatedEvents(
 
     const result = await queryIndexer<{
         events: Array<{ type: string; data: any; transaction_version: string }>;
-    }>(network, query, { eventTypes, limit });
+    }>(network, query, { eventTypes, limit: safeLimit });
 
     if (!result?.events) return [];
 
@@ -187,6 +201,7 @@ export async function fetchTableClosedEvents(
 ): Promise<TableClosedEvent[]> {
     const contract = getGameContract(network);
     const eventTypes = getEventTypeVariants(contract.address, 'TableClosed');
+    const safeLimit = Math.min(limit, INDEXER_EVENT_BATCH_LIMIT);
 
     const query = `
         query FetchTableClosed($eventTypes: [String!], $limit: Int) {
@@ -204,7 +219,7 @@ export async function fetchTableClosedEvents(
 
     const result = await queryIndexer<{
         events: Array<{ type: string; data: any; transaction_version: string }>;
-    }>(network, query, { eventTypes, limit });
+    }>(network, query, { eventTypes, limit: safeLimit });
 
     if (!result?.events) return [];
 
@@ -324,28 +339,19 @@ export async function discoverActiveTables(
     limit: number = 20
 ): Promise<DiscoveredTable[]> {
     pruneStaleTableCache();
+    // Cedra's GraphQL endpoint stalls on larger event queries for this deployment.
+    // Fetch a small recent window and let on-chain summary validation discard dead tables.
+    const created = await fetchTableCreatedEvents(network, limit);
 
-    // Fetch created and closed events (fetch more to account for filtering)
-    const [created, closed] = await Promise.all([
-        fetchTableCreatedEvents(network, limit * 3),
-        fetchTableClosedEvents(network, limit * 3),
-    ]);
-
-    // Build set of closed table addresses
-    const closedSet = new Set(closed.map(e => e.tableAddress));
-
-    // Filter to active tables (created but not closed)
     const activeAddresses = created
-        .filter(e => !closedSet.has(e.tableAddress))
         .filter(e => !staleTableAddresses.has(e.tableAddress))
         .map(e => e.tableAddress);
 
     // Deduplicate
     const uniqueAddresses = [...new Set(activeAddresses)];
 
-    // Fetch summaries for each active table (up to limit)
-    // Fetch summaries for each active table (up to limit) in parallel
-    const targetAddresses = uniqueAddresses.slice(0, limit);
+    // Validate only the most recent window of created tables.
+    const targetAddresses = uniqueAddresses.slice(0, Math.min(limit, INDEXER_EVENT_BATCH_LIMIT));
 
     const summaryPromises = targetAddresses.map(async (address) => {
         try {

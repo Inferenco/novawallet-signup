@@ -1,7 +1,5 @@
 import {
-  createContext,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -12,39 +10,12 @@ import { supabase, type ChatMessage } from "@/lib/supabase";
 import { getNickname } from "../../services/profiles";
 import { normalizeAddress } from "../../utils/address";
 import type { NetworkType } from "../../utils/constants";
+import { ChatContext, type ChatContextValue } from "./chatContextValue";
 
 const HANDLE_KEY = "nova_games_chat_handle";
 const DEFAULT_HANDLE = "Player";
 const RATE_LIMIT_MS = 2000;
 const MAX_MESSAGES = 100;
-
-interface ChatContextValue {
-  messages: ChatMessage[];
-  handle: string;
-  setHandle: (handle: string) => void;
-  sendMessage: (body: string) => Promise<void>;
-  unreadCount: number;
-  clearUnread: () => void;
-  clearMessages: () => Promise<void>;
-  setPanelOpen: (open: boolean) => void;
-  isTableOwner: boolean;
-  setIsTableOwner: (isOwner: boolean) => void;
-  isConnected: boolean;
-  isEnabled: boolean;
-  canSend: boolean;
-  walletAddress: string | null;
-  activeTableId: string | null;
-}
-
-const ChatContext = createContext<ChatContextValue | null>(null);
-
-export function useChatContext() {
-  const context = useContext(ChatContext);
-  if (!context) {
-    throw new Error("useChatContext must be used within a ChatProvider");
-  }
-  return context;
-}
 
 interface ChatProviderProps {
   tableId: string | null;

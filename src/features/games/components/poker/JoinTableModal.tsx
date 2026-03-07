@@ -37,8 +37,11 @@ export function JoinTableModal({
 
   useEffect(() => {
     if (!visible) return;
-    setBuyInAmount(String(minBuyIn));
-    setError(null);
+    const id = window.setTimeout(() => {
+      setBuyInAmount(String(minBuyIn));
+      setError(null);
+    }, 0);
+    return () => window.clearTimeout(id);
   }, [minBuyIn, visible]);
 
   const availableSeats = useMemo(

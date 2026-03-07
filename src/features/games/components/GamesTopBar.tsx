@@ -18,20 +18,24 @@ export function GamesTopBar({
 }: GamesTopBarProps) {
   return (
     <header className="games-topbar">
-      {backTo ? (
-        <Link className="games-icon-button games-icon-button-text" to={backTo}>
-          {backLabel}
-        </Link>
-      ) : (
-        <div style={{ width: 38 }} />
-      )}
+      <div className="games-topbar-slot">
+        {backTo ? (
+          <Link className="games-icon-button games-icon-button-text" to={backTo}>
+            {backLabel}
+          </Link>
+        ) : (
+          <div className="games-topbar-placeholder" />
+        )}
+      </div>
 
       <div className="games-topbar-center">
         <p className="games-topbar-title">{title}</p>
         {subtitle ? <p className="games-topbar-subtitle">{subtitle}</p> : null}
       </div>
 
-      <div>{rightSlot ?? <div style={{ width: 38 }} />}</div>
+      <div className="games-topbar-slot games-topbar-slot-right">
+        {rightSlot ?? <div className="games-topbar-placeholder" />}
+      </div>
     </header>
   );
 }

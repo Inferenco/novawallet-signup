@@ -6,7 +6,7 @@ import { formatCedraFromOctas, shortAddress } from "@/lib/format";
 import { useToast } from "@/providers/ToastProvider";
 import { useWallet } from "@/providers/WalletProvider";
 import { GamesTopBar } from "../components/GamesTopBar";
-import { TABLE_COLORS } from "../config/games";
+import { CHIP_IMAGE_URL, TABLE_COLORS } from "../config/games";
 import { useCedraBalance } from "../hooks/useCedraBalance";
 import { useGamesNetwork } from "../hooks/useGamesNetwork";
 import { useChipActions } from "../hooks/poker/useChipActions";
@@ -48,7 +48,7 @@ export function PokerLandingPage() {
   const { pushToast } = useToast();
   const address = wallet.account?.address?.toString() ?? "";
   const { balance: cedraBalance, refreshBalance: refreshCedraBalance } = useCedraBalance(address);
-  const { tables, refreshTables, isLoading, setMyTable, upsertTable, removeTable } =
+  const { tables, refreshTables, isLoading, lastRefresh, setMyTable, upsertTable, removeTable } =
     usePokerTablesStore();
   const chipActions = useChipActions({ network, playerAddress: address });
   const { refreshBalance: refreshChipBalance } = chipActions;
@@ -113,7 +113,16 @@ export function PokerLandingPage() {
     return () => {
       cancelled = true;
     };
-  }, [address, existingOwnedTableAddress, network, removeTable, setMyTable, upsertTable, wallet.connected]);
+  }, [
+    address,
+    existingOwnedTableAddress,
+    lastRefresh,
+    network,
+    removeTable,
+    setMyTable,
+    upsertTable,
+    wallet.connected
+  ]);
 
   useEffect(() => {
     if (!wallet.connected || tables.length === 0) return;
@@ -139,6 +148,10 @@ export function PokerLandingPage() {
     const normalized = address.toLowerCase();
     return tables.find((table) => table.owner.toLowerCase() === normalized) ?? null;
   }, [address, tables]);
+  const cedraDisplay = useMemo(
+    () => formatCedraFromOctas(BigInt(Math.max(cedraBalance, 0))).replace(/\s+CEDRA$/, ""),
+    [cedraBalance]
+  );
 
   const handleJoin = useCallback(() => {
     if (!wallet.connected) {
@@ -168,148 +181,167 @@ export function PokerLandingPage() {
       <GamesTopBar title="Poker Lobby" backTo="/games" rightSlot={<WalletButton />} />
 
       <div className="games-screen-scroll">
-        <div className="games-screen-content">
-          <div className="games-card games-card-hero">
-            <div className="games-section">
-              <p className="games-section-kicker">Nova Star Hold&apos;em</p>
-              <h1 className="games-section-title">Poker Lobby</h1>
-              <p className="games-section-copy">
-                Join by table address, browse active rooms, or host a new table from the same
-                mobile-first flow.
-              </p>
-            </div>
-          </div>
-
-          <div className="games-poker-balance-row">
-            <span className="games-pill-balance">
-              CEDRA {formatCedraFromOctas(BigInt(Math.max(cedraBalance, 0)))}
-            </span>
-            <span className="games-pill-balance">Chips {formatChips(effectiveChipBalance)}</span>
-          </div>
-
-          {!wallet.connected ? (
-            <div className="games-empty-state">
-              Connect your wallet to join tables, create a room, and use your chip balance.
-            </div>
-          ) : null}
-
-          <div className="games-poker-split-grid">
-            <div className="games-card games-poker-half-card">
-              <div className="games-poker-card-title-row">
-                <p className="games-poker-card-title">Join By Address</p>
+        <div className="games-screen-content games-poker-dashboard">
+          <div className="games-poker-overview-column">
+            <div className="games-card games-card-hero games-poker-hero-card">
+              <div className="games-section">
+                <p className="games-section-kicker">Nova Star Hold&apos;em</p>
+                <h1 className="games-section-title">Poker Lobby</h1>
+                <p className="games-section-copy">
+                  Join direct by address, browse live rooms, or host a polished five-seat table on
+                  the same premium flow across mobile and desktop.
+                </p>
               </div>
-              <label className="games-field">
-                <span className="games-field-label">Table address</span>
-                <input
-                  className="games-input"
-                  value={joinAddress}
-                  placeholder="0x..."
-                  onChange={(event) => setJoinAddress(event.target.value)}
-                />
-              </label>
-              <button
-                type="button"
-                className="games-button games-button-primary"
-                disabled={!wallet.connected || !hasConfiguredGameContracts()}
-                onClick={handleJoin}
-              >
-                Join Table
-              </button>
-            </div>
-
-            <div className="games-card games-poker-half-card">
-              <div className="games-poker-card-title-row">
-                <p className="games-poker-card-title">Create Table</p>
+              <div className="games-poker-hero-highlights">
+                <span>5-seat cash tables</span>
+                <span>Owner controls</span>
+                <span>Responsive game room</span>
               </div>
-              <div className="games-poker-create-icon">+</div>
-              <p className="games-section-copy">
-                Configure blinds, buy-in limits, speed, and table theme for a new game.
-              </p>
-              <Link className="games-button-link games-button-link-primary" to="/games/poker/create">
-                Host New Table
-              </Link>
             </div>
-          </div>
 
-          <div className="games-card games-poker-owner-card">
-            <div className="games-poker-owner-header">
-              <div>
-                <p className="games-section-kicker">Owner Panel</p>
-                <h2 className="games-section-title">Your Table</h2>
+            <div className="games-poker-balance-row">
+              <span className="games-pill-balance">
+                <span className="games-pill-label">CEDRA</span>
+                <span>{cedraDisplay}</span>
+              </span>
+              <span className="games-pill-balance games-pill-balance-chip">
+                <img src={CHIP_IMAGE_URL} alt="" aria-hidden="true" />
+                <span className="games-pill-label">Chips</span>
+                <span>{formatChips(effectiveChipBalance)}</span>
+              </span>
+            </div>
+
+            {!wallet.connected ? (
+              <div className="games-empty-state games-poker-wallet-note">
+                Connect your wallet to join tables, create a room, and use your chip balance.
               </div>
-              {myTable ? <span className="games-poker-owner-badge">OWNER</span> : null}
-            </div>
+            ) : null}
 
-            {myTable ? (
-              <Link className="games-poker-owner-row" to={`/games/poker/${myTable.tableAddress}`}>
-                <TableAvatar
-                  avatarUrl={adminProfiles.get(myTable.owner)?.avatarUrl}
-                  colorIndex={myTable.colorIndex}
-                  fallback="♠"
-                />
-                <div className="games-poker-list-meta">
-                  <p className="games-poker-list-title">{myTable.name || "Nova Poker"}</p>
-                  <p className="games-poker-list-copy">
-                    {myTable.smallBlind}/{myTable.bigBlind} • {myTable.occupiedSeats}/
-                    {myTable.totalSeats} seated
-                  </p>
+            <div className="games-card games-card-body games-section games-poker-live-card">
+              <div className="games-inline-row" style={{ justifyContent: "space-between" }}>
+                <div>
+                  <p className="games-section-kicker">Active Tables</p>
+                  <h2 className="games-section-title">Live Lobby</h2>
                 </div>
-                <span className="games-button games-button-accent">Open</span>
-              </Link>
-            ) : (
-              <div className="games-empty-state">
-                Create a table to host your own game and re-enter it from this panel.
+                <Link className="games-button-link games-button-link-secondary" to="/games/poker/tables">
+                  Browse All
+                </Link>
               </div>
-            )}
+
+              <div className="games-poker-list-scroll">
+                {isLoading ? (
+                  <div className="games-empty-state">Loading tables...</div>
+                ) : tables.length === 0 ? (
+                  <div className="games-poker-empty">
+                    <p className="games-section-title">No active tables yet</p>
+                    <p className="games-section-copy">
+                      Host a room or enter by address to start the floor.
+                    </p>
+                  </div>
+                ) : (
+                  tables.slice(0, 3).map((table) => {
+                    const host = adminProfiles.get(table.owner);
+
+                    return (
+                      <Link
+                        key={table.tableAddress}
+                        className="games-poker-list-row"
+                        to={`/games/poker/${table.tableAddress}`}
+                      >
+                        <TableAvatar
+                          avatarUrl={host?.avatarUrl}
+                          colorIndex={table.colorIndex}
+                          fallback="♠"
+                        />
+                        <div className="games-poker-list-meta">
+                          <p className="games-poker-list-title">{table.name || "Nova Poker"}</p>
+                          <p className="games-poker-list-copy">
+                            {table.smallBlind}/{table.bigBlind}
+                            {table.ante > 0 ? ` • ante ${table.ante}` : ""}
+                            {table.straddleEnabled ? " • straddle" : ""}
+                          </p>
+                          <p className="games-poker-list-copy">
+                            Host {host?.nickname || shortAddress(table.owner)} • {table.occupiedSeats}/
+                            {table.totalSeats}
+                          </p>
+                        </div>
+                        <span className="games-button games-button-accent">Join</span>
+                      </Link>
+                    );
+                  })
+                )}
+              </div>
+            </div>
           </div>
 
-          <div className="games-card games-card-body games-section">
-            <div className="games-inline-row" style={{ justifyContent: "space-between" }}>
-              <div>
-                <p className="games-section-kicker">Active Tables</p>
-                <h2 className="games-section-title">Live Lobby</h2>
+          <div className="games-poker-actions-column">
+            <div className="games-poker-split-grid">
+              <div className="games-card games-poker-half-card">
+                <div className="games-poker-card-title-row">
+                  <p className="games-poker-card-title">Join By Address</p>
+                </div>
+                <label className="games-field">
+                  <span className="games-field-label">Table address</span>
+                  <input
+                    className="games-input"
+                    value={joinAddress}
+                    placeholder="0x..."
+                    onChange={(event) => setJoinAddress(event.target.value)}
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="games-button games-button-primary"
+                  disabled={!wallet.connected || !hasConfiguredGameContracts()}
+                  onClick={handleJoin}
+                >
+                  Join Table
+                </button>
               </div>
-              <Link className="games-button-link games-button-link-secondary" to="/games/poker/tables">
-                Browse All
-              </Link>
+
+              <div className="games-card games-poker-half-card">
+                <div className="games-poker-card-title-row">
+                  <p className="games-poker-card-title">Create Table</p>
+                </div>
+                <div className="games-poker-create-icon">+</div>
+                <p className="games-section-copy">
+                  Configure blinds, buy-in limits, speed, and table theme for a new game.
+                </p>
+                <Link className="games-button-link games-button-link-primary" to="/games/poker/create">
+                  Host New Table
+                </Link>
+              </div>
             </div>
 
-            <div className="games-poker-list-scroll">
-              {isLoading ? (
-                <div className="games-empty-state">Loading tables...</div>
-              ) : tables.length === 0 ? (
-                <div className="games-empty-state">No active tables are available right now.</div>
-              ) : (
-                tables.map((table) => {
-                  const host = adminProfiles.get(table.owner);
+            <div className="games-card games-poker-owner-card">
+              <div className="games-poker-owner-header">
+                <div>
+                  <p className="games-section-kicker">Owner Panel</p>
+                  <h2 className="games-section-title">Your Table</h2>
+                </div>
+                {myTable ? <span className="games-poker-owner-badge">OWNER</span> : null}
+              </div>
 
-                  return (
-                    <Link
-                      key={table.tableAddress}
-                      className="games-poker-list-row"
-                      to={`/games/poker/${table.tableAddress}`}
-                    >
-                      <TableAvatar
-                        avatarUrl={host?.avatarUrl}
-                        colorIndex={table.colorIndex}
-                        fallback="♠"
-                      />
-                      <div className="games-poker-list-meta">
-                        <p className="games-poker-list-title">{table.name || "Nova Poker"}</p>
-                        <p className="games-poker-list-copy">
-                          {table.smallBlind}/{table.bigBlind}
-                          {table.ante > 0 ? ` • ante ${table.ante}` : ""}
-                          {table.straddleEnabled ? " • straddle" : ""}
-                        </p>
-                        <p className="games-poker-list-copy">
-                          Host {host?.nickname || shortAddress(table.owner)} • {table.occupiedSeats}/
-                          {table.totalSeats}
-                        </p>
-                      </div>
-                      <span className="games-button games-button-accent">Join</span>
-                    </Link>
-                  );
-                })
+              {myTable ? (
+                <Link className="games-poker-owner-row" to={`/games/poker/${myTable.tableAddress}`}>
+                  <TableAvatar
+                    avatarUrl={adminProfiles.get(myTable.owner)?.avatarUrl}
+                    colorIndex={myTable.colorIndex}
+                    fallback="♠"
+                  />
+                  <div className="games-poker-list-meta">
+                    <p className="games-poker-list-title">{myTable.name || "Nova Poker"}</p>
+                    <p className="games-poker-list-copy">
+                      {myTable.smallBlind}/{myTable.bigBlind} blinds • {myTable.occupiedSeats}/
+                      {myTable.totalSeats} seated
+                    </p>
+                  </div>
+                  <span className="games-button games-button-accent">Open</span>
+                </Link>
+              ) : (
+                <div className="games-empty-state">
+                  Create a table to host your own game and re-enter it from this panel.
+                </div>
               )}
             </div>
           </div>
