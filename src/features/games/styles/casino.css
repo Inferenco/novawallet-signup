@@ -1,52 +1,103 @@
-.games-casino-hero-title {
-  font-size: 2.15rem;
-  line-height: 1;
+.games-casino-grid {
+  display: grid;
+  gap: clamp(16px, 2vw, 22px);
 }
 
-.games-casino-stats {
-  display: grid;
-  gap: 10px;
+.games-casino-hero-card {
+  min-height: 0;
+}
+
+.games-casino-hero-title {
+  font-size: clamp(1.85rem, 3vw, 2.4rem);
+  line-height: 0.98;
+}
+
+.games-casino-free-card,
+.games-casino-store-card,
+.games-casino-games-card {
+  min-height: 100%;
 }
 
 .games-casino-inline-stats {
   display: grid;
+  gap: 12px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
 }
 
 .games-casino-stat-card {
-  padding: 12px;
-  border-radius: 16px;
+  padding: 16px;
+  border-radius: 20px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.04);
+  display: grid;
+  gap: 10px;
 }
 
 .games-casino-stat-label {
-  margin: 0 0 6px;
+  margin: 0;
   font-size: 0.72rem;
-  font-weight: 700;
+  font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: rgba(255, 255, 255, 0.56);
+  letter-spacing: 0.12em;
+  color: rgba(236, 230, 218, 0.54);
 }
 
 .games-casino-stat-value {
   margin: 0;
-  font-size: 1.35rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-family: "Sora", "Manrope", sans-serif;
+  font-size: clamp(1.24rem, 1.8vw, 1.65rem);
+  font-weight: 700;
+  line-height: 1.08;
+}
+
+.games-casino-stat-value img,
+.games-casino-chip-inline img {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+}
+
+.games-casino-stat-value-balance {
+  gap: 8px;
+}
+
+.games-casino-stat-value-balance span:first-child {
+  overflow-wrap: anywhere;
+}
+
+.games-casino-stat-unit {
+  font-size: 0.78rem;
   font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(236, 230, 218, 0.58);
+}
+
+.games-casino-stat-value-chip {
+  gap: 8px;
+}
+
+.games-casino-gift {
+  font-size: 1rem;
 }
 
 .games-casino-boost-row,
 .games-casino-game-row,
 .games-poker-list-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 12px;
-  justify-content: space-between;
-  padding: 14px;
-  border-radius: 16px;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 20px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(10, 15, 27, 0.74);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02)),
+    rgba(10, 13, 18, 0.72);
   color: inherit;
   text-decoration: none;
 }
@@ -55,7 +106,6 @@
 .games-casino-game-meta,
 .games-poker-list-meta {
   min-width: 0;
-  flex: 1;
   display: grid;
   gap: 4px;
 }
@@ -69,38 +119,93 @@
 .games-casino-boost-title,
 .games-casino-game-title,
 .games-poker-list-title {
+  font-family: "Sora", "Manrope", sans-serif;
   font-size: 1rem;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .games-casino-boost-copy,
 .games-casino-game-copy,
 .games-poker-list-copy {
-  color: rgba(255, 255, 255, 0.6);
-  line-height: 1.45;
+  color: rgba(236, 230, 218, 0.66);
+  line-height: 1.52;
 }
 
 .games-casino-chip-inline {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-}
-
-.games-casino-chip-inline img {
-  width: 16px;
-  height: 16px;
+  vertical-align: middle;
 }
 
 .games-casino-disclaimer {
-  font-size: 0.82rem;
-  color: rgba(255, 255, 255, 0.54);
-  line-height: 1.45;
+  font-size: 0.84rem;
+  color: rgba(236, 230, 218, 0.62);
+  line-height: 1.55;
 }
 
-.games-casino-game-icon {
+.games-casino-game-icon,
+.games-poker-table-icon {
   width: 58px;
   height: 58px;
-  border-radius: 16px;
-  object-fit: contain;
+  border-radius: 18px;
+  object-fit: cover;
   background: rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.games-poker-table-icon {
+  display: grid;
+  place-items: center;
+}
+
+.games-poker-table-icon-fallback {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: #fff;
+}
+
+.games-casino-game-row .games-button-link,
+.games-poker-list-row .games-button {
+  white-space: nowrap;
+}
+
+@media (min-width: 1120px) {
+  .games-casino-grid {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+  }
+
+  .games-casino-grid > .games-empty-state {
+    grid-column: 1 / -1;
+  }
+
+  .games-casino-free-card {
+    grid-column: span 4;
+  }
+
+  .games-casino-store-card {
+    grid-column: span 4;
+  }
+
+  .games-casino-games-card {
+    grid-column: span 4;
+  }
+}
+
+@media (max-width: 639px) {
+  .games-casino-inline-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .games-casino-boost-row,
+  .games-casino-game-row,
+  .games-poker-list-row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .games-casino-boost-row > :last-child,
+  .games-casino-game-row > :last-child,
+  .games-poker-list-row > :last-child {
+    grid-column: 1 / -1;
+  }
 }

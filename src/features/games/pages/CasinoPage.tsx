@@ -19,6 +19,7 @@ import {
   getCurrentTerms,
   hasAcknowledgedCurrent
 } from "../services/consent";
+import { CHIP_IMAGE_URL } from "../config/games";
 import { formatChips } from "../services/poker/chips";
 import "../styles/casino.css";
 
@@ -251,6 +252,10 @@ export function CasinoPage() {
 
     return `${chipActions.multiplierStatus.factor}x active`;
   }, [chipActions.multiplierStatus.factor, chipActions.multiplierStatus.isActive]);
+  const cedraDisplay = useMemo(
+    () => formatCedraFromOctas(BigInt(Math.max(cedraBalance, 0))).replace(/\s+CEDRA$/, ""),
+    [cedraBalance]
+  );
 
   if (!wallet.connected) {
     return (
@@ -271,7 +276,7 @@ export function CasinoPage() {
 
       <div className="games-screen-scroll">
         <div className="games-screen-content">
-          <div className="games-card games-card-hero">
+          <div className="games-card games-card-hero games-casino-hero-card">
             <div className="games-section">
               <p className="games-section-kicker">Daily Rewards</p>
               <h1 className="games-section-title games-casino-hero-title">Chips & Boosts</h1>
@@ -281,83 +286,93 @@ export function CasinoPage() {
             </div>
           </div>
 
-          {!hasConfiguredGameContracts() ? (
-            <div className="games-empty-state">
-              Configure `VITE_GAME_CONTRACT_ADDRESS` and the games wallet contract env vars to use
-              live casino actions.
+          <div className="games-casino-grid">
+            {!hasConfiguredGameContracts() ? (
+              <div className="games-empty-state">
+                Configure `VITE_GAME_CONTRACT_ADDRESS` and the games wallet contract env vars to use
+                live casino actions.
+              </div>
+            ) : null}
+
+            <FreeChipsCard
+              dailyAmount={freeChips.dailyAmount}
+              boostedDailyAmount={freeChips.boostedDailyAmount}
+              multiplierFactor={freeChips.multiplierFactor}
+              multiplierTimeLeft={freeChips.multiplierTimeLeft}
+              canClaim={freeChips.canClaim}
+              timeUntilNext={freeChips.timeUntilNext}
+              isClaiming={freeChips.isClaiming}
+              error={freeChips.error}
+              onClaim={() => {
+                void handleClaim();
+              }}
+            />
+
+            <div className="games-card games-card-body games-section games-casino-store-card">
+              <div className="games-inline-row" style={{ justifyContent: "space-between" }}>
+                <div>
+                  <p className="games-section-kicker">Boost Store</p>
+                  <h2 className="games-section-title">Multiplier Upgrades</h2>
+                </div>
+                <button
+                  type="button"
+                  className="games-button games-button-accent"
+                  onClick={() => setShowBoostStore(true)}
+                >
+                  Open Store
+                </button>
+              </div>
+
+              <div className="games-casino-inline-stats">
+                <div className="games-casino-stat-card">
+                  <p className="games-casino-stat-label">CEDRA Wallet</p>
+                  <p className="games-casino-stat-value games-casino-stat-value-balance">
+                    <span>{cedraDisplay}</span>
+                    <span className="games-casino-stat-unit">CEDRA</span>
+                  </p>
+                </div>
+                <div className="games-casino-stat-card">
+                  <p className="games-casino-stat-label">Chip Wallet</p>
+                  <p className="games-casino-stat-value games-casino-stat-value-chip">
+                    <img src={CHIP_IMAGE_URL} alt="" aria-hidden="true" />
+                    <span>{formatChips(chipActions.chipBalance)}</span>
+                  </p>
+                </div>
+              </div>
+
+              <p className="games-casino-disclaimer">
+                {boostSummary}. Current boosted claim:{" "}
+                <span className="games-casino-chip-inline">
+                  <img src={CHIP_IMAGE_URL} alt="" aria-hidden="true" />
+                  {formatChips(freeChips.boostedDailyAmount)} chips
+                </span>
+                .
+              </p>
             </div>
-          ) : null}
 
-          <FreeChipsCard
-            dailyAmount={freeChips.dailyAmount}
-            boostedDailyAmount={freeChips.boostedDailyAmount}
-            multiplierFactor={freeChips.multiplierFactor}
-            multiplierTimeLeft={freeChips.multiplierTimeLeft}
-            canClaim={freeChips.canClaim}
-            timeUntilNext={freeChips.timeUntilNext}
-            isClaiming={freeChips.isClaiming}
-            error={freeChips.error}
-            onClaim={() => {
-              void handleClaim();
-            }}
-          />
-
-          <div className="games-card games-card-body games-section">
-            <div className="games-inline-row" style={{ justifyContent: "space-between" }}>
+            <div className="games-card games-card-body games-section games-casino-games-card">
               <div>
-                <p className="games-section-kicker">Boost Store</p>
-                <h2 className="games-section-title">Multiplier Upgrades</h2>
+                <p className="games-section-kicker">Available Games</p>
+                <h2 className="games-section-title">Live Tables</h2>
               </div>
-              <button
-                type="button"
-                className="games-button games-button-accent"
-                onClick={() => setShowBoostStore(true)}
-              >
-                Open Store
-              </button>
-            </div>
 
-            <div className="games-casino-inline-stats">
-              <div className="games-casino-stat-card">
-                <p className="games-casino-stat-label">CEDRA Wallet</p>
-                <p className="games-casino-stat-value">
-                  {formatCedraFromOctas(BigInt(Math.max(cedraBalance, 0)))}
-                </p>
+              <div className="games-casino-game-row">
+                <img
+                  className="games-casino-game-icon"
+                  src="/assets/casino/game-icon.png"
+                  alt="Poker"
+                />
+                <div className="games-casino-game-meta">
+                  <p className="games-casino-game-title">Texas Hold&apos;em</p>
+                  <p className="games-casino-game-copy">
+                    Use your chip balance to join direct tables, browse active rooms, or host your
+                    own.
+                  </p>
+                </div>
+                <Link className="games-button-link games-button-link-primary" to="/games/poker">
+                  Enter
+                </Link>
               </div>
-              <div className="games-casino-stat-card">
-                <p className="games-casino-stat-label">Chip Wallet</p>
-                <p className="games-casino-stat-value">{formatChips(chipActions.chipBalance)}</p>
-              </div>
-            </div>
-
-            <p className="games-casino-disclaimer">
-              {boostSummary}. Current boosted claim:{" "}
-              {formatChips(freeChips.boostedDailyAmount)} chips.
-            </p>
-          </div>
-
-          <div className="games-card games-card-body games-section">
-            <div>
-              <p className="games-section-kicker">Available Games</p>
-              <h2 className="games-section-title">Live Tables</h2>
-            </div>
-
-            <div className="games-casino-game-row">
-              <img
-                className="games-casino-game-icon"
-                src="/assets/casino/game-icon.png"
-                alt="Poker"
-              />
-              <div className="games-casino-game-meta">
-                <p className="games-casino-game-title">Texas Hold&apos;em</p>
-                <p className="games-casino-game-copy">
-                  Use your chip balance to join direct tables, browse active rooms, or host your
-                  own.
-                </p>
-              </div>
-              <Link className="games-button-link games-button-link-primary" to="/games/poker">
-                Enter
-              </Link>
             </div>
           </div>
         </div>

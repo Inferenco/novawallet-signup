@@ -34,6 +34,7 @@ export function PokerTablesPage() {
   const {
     refreshTables,
     isLoading,
+    error,
     searchQuery,
     setSearchQuery,
     hasMore,
@@ -105,6 +106,20 @@ export function PokerTablesPage() {
             <div className="games-poker-list-scroll">
               {isLoading ? (
                 <div className="games-empty-state">Loading tables...</div>
+              ) : error ? (
+                <div className="games-poker-empty">
+                  <p className="games-section-title">Unable to load tables</p>
+                  <p className="games-section-copy">{error}</p>
+                  <button
+                    type="button"
+                    className="games-button games-button-primary"
+                    onClick={() => {
+                      void refreshTables(network, 20);
+                    }}
+                  >
+                    Retry
+                  </button>
+                </div>
               ) : filteredTables.length === 0 ? (
                 <div className="games-poker-empty">
                   <p className="games-section-title">No tables found</p>
@@ -143,7 +158,7 @@ export function PokerTablesPage() {
               )}
             </div>
 
-            {hasMore ? (
+            {hasMore && !isLoading ? (
               <button
                 type="button"
                 className="games-button games-button-secondary"

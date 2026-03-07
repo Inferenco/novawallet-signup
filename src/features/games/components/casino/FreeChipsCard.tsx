@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { CHIP_IMAGE_URL } from "../../config/games";
 import { formatChips } from "../../services/poker/chips";
 
 interface FreeChipsCardProps {
@@ -72,15 +73,18 @@ export function FreeChipsCard({
   const effectiveCanClaim = canClaim || countdown <= 0;
 
   return (
-    <div className="games-card games-card-body games-section">
+    <div className="games-card games-card-body games-section games-casino-free-card">
       <div className="games-inline-row" style={{ justifyContent: "space-between" }}>
         <p className="games-field-label" style={{ margin: 0 }}>
           Daily Free Chips
         </p>
-        <span aria-hidden="true">🎁</span>
+        <span className="games-casino-gift" aria-hidden="true">
+          🎁
+        </span>
       </div>
-      <p className="games-casino-stat-value" style={{ margin: 0 }}>
-        {claimsDisabled ? "Free claims disabled" : `${formatChips(displayAmount)} chips`}
+      <p className="games-casino-stat-value games-casino-stat-value-chip" style={{ margin: 0 }}>
+        <img src={CHIP_IMAGE_URL} alt="" aria-hidden="true" />
+        <span>{claimsDisabled ? "Free claims disabled" : `${formatChips(displayAmount)} chips`}</span>
       </p>
       {hasBoost ? (
         <p className="games-status-text">

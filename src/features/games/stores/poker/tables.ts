@@ -58,6 +58,27 @@ const initialState = {
     lastRefresh: null,
 };
 
+const TABLE_DISCOVERY_TIMEOUT_MS = 12_000;
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+    return new Promise((resolve, reject) => {
+        const timer = globalThis.setTimeout(() => {
+            reject(new Error('Timed out while loading tables.'));
+        }, timeoutMs);
+
+        promise.then(
+            (value) => {
+                globalThis.clearTimeout(timer);
+                resolve(value);
+            },
+            (error) => {
+                globalThis.clearTimeout(timer);
+                reject(error);
+            }
+        );
+    });
+}
+
 export const usePokerTablesStore = create<PokerTablesState>((set, get) => ({
     ...initialState,
 
@@ -65,7 +86,10 @@ export const usePokerTablesStore = create<PokerTablesState>((set, get) => ({
         set({ isLoading: true, error: null });
 
         try {
-            const tables = await discoverActiveTables(network, limit);
+            const tables = await withTimeout(
+                discoverActiveTables(network, limit),
+                TABLE_DISCOVERY_TIMEOUT_MS
+            );
 
             set({
                 tables,
@@ -78,6 +102,7 @@ export const usePokerTablesStore = create<PokerTablesState>((set, get) => ({
             set({
                 isLoading: false,
                 error: 'Failed to load tables. Please try again.',
+                hasMore: false,
             });
         }
     },
@@ -91,7 +116,10 @@ export const usePokerTablesStore = create<PokerTablesState>((set, get) => ({
 
         try {
             // Fetch next batch of 20
-            const newTables = await discoverActiveTables(network, tables.length + 20);
+            const newTables = await withTimeout(
+                discoverActiveTables(network, tables.length + 20),
+                TABLE_DISCOVERY_TIMEOUT_MS
+            );
 
             // Get only the new ones
             const existingAddresses = new Set(tables.map(t => t.tableAddress));
@@ -107,6 +135,7 @@ export const usePokerTablesStore = create<PokerTablesState>((set, get) => ({
             set({
                 isLoadingMore: false,
                 error: 'Failed to load more tables.',
+                hasMore: false,
             });
         }
     },

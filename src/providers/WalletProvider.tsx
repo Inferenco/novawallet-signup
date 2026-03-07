@@ -53,6 +53,8 @@ interface WalletSnapshot {
 }
 
 const WalletContext = createContext<WalletContextState | null>(null);
+const MOCK_WALLET_STORAGE_KEY = "nova_mock_wallet_name";
+const MOCK_WALLET_ADDRESS = `0x${"67e3f94a".repeat(8)}`;
 
 const initialSnapshot: WalletSnapshot = {
   connected: false,
@@ -82,32 +84,53 @@ function getWalletCore(): WalletCore {
   return walletCoreInstance;
 }
 
+function buildMockAccount(): AccountInfo {
+  return { address: { toString: () => MOCK_WALLET_ADDRESS } } as unknown as AccountInfo;
+}
+
+function buildMockNetwork(): NetworkInfo {
+  return {
+    name:
+      window.localStorage.getItem("nova_mock_network_mismatch") === "1" ? "devnet" : "testnet"
+  } as NetworkInfo;
+}
+
 function useMockWallet() {
   const [state, setState] = useState<WalletSnapshot>(() => ({
     ...initialSnapshot,
-    wallets: [{ name: "Mock Zedra" }, { name: "Mock Nightly" }]
+    wallets: [{ name: "Mock Zedra" }, { name: "Mock Nightly" }],
+    connected: typeof window !== "undefined" && Boolean(window.localStorage.getItem(MOCK_WALLET_STORAGE_KEY)),
+    wallet:
+      typeof window !== "undefined" && window.localStorage.getItem(MOCK_WALLET_STORAGE_KEY)
+        ? { name: window.localStorage.getItem(MOCK_WALLET_STORAGE_KEY) as string }
+        : null,
+    account:
+      typeof window !== "undefined" && window.localStorage.getItem(MOCK_WALLET_STORAGE_KEY)
+        ? buildMockAccount()
+        : null,
+    network:
+      typeof window !== "undefined" && window.localStorage.getItem(MOCK_WALLET_STORAGE_KEY)
+        ? buildMockNetwork()
+        : null
   }));
 
   const connect = useCallback(async (walletName: string) => {
     setState((prev) => ({ ...prev, connecting: true }));
     await new Promise((resolve) => setTimeout(resolve, 200));
+    window.localStorage.setItem(MOCK_WALLET_STORAGE_KEY, walletName);
 
     setState((prev) => ({
       ...prev,
       connecting: false,
       connected: true,
       wallet: { name: walletName },
-      account: { address: { toString: () => "0xabc" } } as unknown as AccountInfo,
-      network: {
-        name:
-          window.localStorage.getItem("nova_mock_network_mismatch") === "1"
-            ? "devnet"
-            : "testnet"
-      } as NetworkInfo
+      account: buildMockAccount(),
+      network: buildMockNetwork()
     }));
   }, []);
 
   const disconnect = useCallback(async () => {
+    window.localStorage.removeItem(MOCK_WALLET_STORAGE_KEY);
     setState((prev) => ({
       ...prev,
       connected: false,
