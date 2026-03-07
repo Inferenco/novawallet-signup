@@ -162,13 +162,13 @@ export function CasinoPage() {
     const activeSigner = requireSigner();
     if (!activeSigner) return;
 
-      const success = await freeChips.doClaimFreeChips(activeSigner);
-      if (success) {
-        await Promise.all([
-          refreshChipBalance(),
-          refreshClaimStatus(),
-          refreshCedraBalance()
-        ]);
+    const success = await freeChips.doClaimFreeChips(activeSigner);
+    if (success) {
+      await Promise.all([
+        refreshChipBalance(),
+        refreshClaimStatus(),
+        refreshCedraBalance()
+      ]);
       pushToast("success", "Free chips claimed.");
       return;
     }
@@ -177,7 +177,6 @@ export function CasinoPage() {
       await openDisclaimerForRetry(handleClaim);
     }
   }, [
-    chipActions,
     freeChips,
     openDisclaimerForRetry,
     pushToast,
@@ -214,7 +213,6 @@ export function CasinoPage() {
     },
     [
       chipActions,
-      freeChips,
       openDisclaimerForRetry,
       pushToast,
       refreshChipBalance,

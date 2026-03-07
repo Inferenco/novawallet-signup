@@ -172,7 +172,7 @@ function PokerGameplayContent({ tableAddress }: PokerGameplayContentProps) {
   const [newMaxBuyIn, setNewMaxBuyIn] = useState("");
   const [nowMs, setNowMs] = useState(0);
   const [failedAvatarUrls, setFailedAvatarUrls] = useState<Set<string>>(new Set());
-  const [routeReadyForErrors, setRouteReadyForErrors] = useState(false);
+  const routeReadyForErrorsRef = useRef(false);
   const [showdownData, setShowdownData] = useState<ShowdownState>({
     visible: false,
     winners: [],
@@ -257,15 +257,15 @@ function PokerGameplayContent({ tableAddress }: PokerGameplayContentProps) {
   });
 
   useEffect(() => {
-    setRouteReadyForErrors(false);
+    routeReadyForErrorsRef.current = false;
     clearError();
     if (!tableAddress || !contractsReady) return;
     setActiveTable(tableAddress, network);
     void refreshTableData(address || undefined);
-    setRouteReadyForErrors(true);
+    routeReadyForErrorsRef.current = true;
 
     return () => {
-      setRouteReadyForErrors(false);
+      routeReadyForErrorsRef.current = false;
       reset();
     };
   }, [address, clearError, contractsReady, network, refreshTableData, reset, setActiveTable, tableAddress]);
@@ -329,30 +329,25 @@ function PokerGameplayContent({ tableAddress }: PokerGameplayContentProps) {
   }, [isMyTurn, needsCommit, needsReveal, setUrgent]);
 
   useEffect(() => {
-    if (routeReadyForErrors && error === "TABLE_CLOSED") {
+    if (routeReadyForErrorsRef.current && error === "TABLE_CLOSED") {
       clearError();
       pushToast("info", "This table was closed.");
       navigate("/games/poker", { replace: true });
     }
-  }, [clearError, error, navigate, pushToast, routeReadyForErrors]);
+  }, [clearError, error, navigate, pushToast]);
 
   useEffect(() => {
     if (!actionLocked) return;
 
-    if (phase < GAME_PHASES.PREFLOP || phase > GAME_PHASES.RIVER) {
-      setActionLocked(false);
-      return;
-    }
-    if (!isMyTurn) {
-      setActionLocked(false);
-      return;
-    }
-    if (actionLockPhase !== null && phase !== actionLockPhase) {
-      setActionLocked(false);
-      return;
-    }
-    if (actionLockHand !== null && tableState?.handNumber && tableState.handNumber !== actionLockHand) {
-      setActionLocked(false);
+    const shouldUnlock =
+      phase < GAME_PHASES.PREFLOP ||
+      phase > GAME_PHASES.RIVER ||
+      !isMyTurn ||
+      (actionLockPhase !== null && phase !== actionLockPhase) ||
+      (actionLockHand !== null && tableState?.handNumber != null && tableState.handNumber !== actionLockHand);
+    if (shouldUnlock) {
+      const id = window.setTimeout(() => setActionLocked(false), 0);
+      return () => window.clearTimeout(id);
     }
   }, [actionLockHand, actionLockPhase, actionLocked, isMyTurn, phase, tableState?.handNumber]);
 
@@ -366,7 +361,10 @@ function PokerGameplayContent({ tableAddress }: PokerGameplayContentProps) {
     previousHandNumberRef.current = null;
     processedHandsRef.current = new Set();
     latestHandRef.current = 0;
-    setShowdownData((current) => ({ ...current, visible: false }));
+    const id = window.setTimeout(() => {
+      setShowdownData((current) => (current.visible ? { ...current, visible: false } : current));
+    }, 0);
+    return () => window.clearTimeout(id);
   }, [tableAddress]);
 
   useEffect(() => {
@@ -394,7 +392,11 @@ function PokerGameplayContent({ tableAddress }: PokerGameplayContentProps) {
       }
     } else {
       if (currentHand > prevHand) {
-        setShowdownData((current) => ({ ...current, visible: false }));
+        // Hide showdown when hand increments — scheduled via setTimeout to
+        // avoid synchronous setState inside an effect body.
+        window.setTimeout(() => {
+          setShowdownData((current) => (current.visible ? { ...current, visible: false } : current));
+        }, 0);
       }
 
       if (handIncremented) {
@@ -644,9 +646,9 @@ function PokerGameplayContent({ tableAddress }: PokerGameplayContentProps) {
 
   const canStartHand = Boolean(
     summary &&
-      !summary.isPaused &&
-      activeSeatCount >= 2 &&
-      (!summary.ownerOnlyStart || isAdmin)
+    !summary.isPaused &&
+    activeSeatCount >= 2 &&
+    (!summary.ownerOnlyStart || isAdmin)
   );
 
   const canStraddle = useMemo(() => {
@@ -901,9 +903,8 @@ function PokerGameplayContent({ tableAddress }: PokerGameplayContentProps) {
                 <button
                   key={actualSeatIndex}
                   type="button"
-                  className={`games-wallet-seat games-wallet-seat-${displayPosition} ${
-                    isActive ? "active" : ""
-                  } ${mySeatIndex === actualSeatIndex ? "hero" : ""} ${canJoinThisSeat ? "joinable" : ""}`}
+                  className={`games-wallet-seat games-wallet-seat-${displayPosition} ${isActive ? "active" : ""
+                    } ${mySeatIndex === actualSeatIndex ? "hero" : ""} ${canJoinThisSeat ? "joinable" : ""}`}
                   onClick={() => {
                     if (canJoinThisSeat) {
                       setJoinSeat(actualSeatIndex);

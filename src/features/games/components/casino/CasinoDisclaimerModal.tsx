@@ -48,9 +48,11 @@ export function CasinoDisclaimerModal({
   const modalTitle = (title || parsedTerms.title || "Casino Notice").trim();
 
   useEffect(() => {
-    if (visible) {
+    if (!visible) return;
+    const id = window.setTimeout(() => {
       setHasScrolledToBottom(false);
-    }
+    }, 0);
+    return () => window.clearTimeout(id);
   }, [termsError, termsMarkdown, visible]);
 
   if (!visible) return null;
@@ -104,46 +106,46 @@ export function CasinoDisclaimerModal({
           ) : null}
           {!isLoadingTerms && !termsError && termsMarkdown.trim().length > 0 && termsFormat === "text/markdown"
             ? parsedTerms.blocks.map((block, index) => {
-                if (block.type === "heading1") {
-                  return (
-                    <p key={index} className="games-status-text" style={{ display: "none" }}>
-                      {block.text}
-                    </p>
-                  );
-                }
-                if (block.type === "heading2") {
-                  return (
-                    <h4 key={index} className="games-section-title games-disclaimer-section-title">
-                      {block.text}
-                    </h4>
-                  );
-                }
-                if (block.type === "list") {
-                  return (
-                    <ul key={index} className="games-disclaimer-list">
-                      {block.items.map((item, itemIndex) => (
-                        <li key={itemIndex} className="games-section-copy">
-                          {renderInlineSegments(item)}
-                        </li>
-                      ))}
-                    </ul>
-                  );
-                }
-                if (isAcknowledgmentParagraph(block)) {
-                  return (
-                    <div key={index} className="games-card games-disclaimer-highlight">
-                      <p className="games-section-copy games-disclaimer-highlight-copy">
-                        {renderInlineSegments(block.segments)}
-                      </p>
-                    </div>
-                  );
-                }
+              if (block.type === "heading1") {
                 return (
-                  <p key={index} className="games-section-copy">
-                    {renderInlineSegments(block.segments)}
+                  <p key={index} className="games-status-text" style={{ display: "none" }}>
+                    {block.text}
                   </p>
                 );
-              })
+              }
+              if (block.type === "heading2") {
+                return (
+                  <h4 key={index} className="games-section-title games-disclaimer-section-title">
+                    {block.text}
+                  </h4>
+                );
+              }
+              if (block.type === "list") {
+                return (
+                  <ul key={index} className="games-disclaimer-list">
+                    {block.items.map((item, itemIndex) => (
+                      <li key={itemIndex} className="games-section-copy">
+                        {renderInlineSegments(item)}
+                      </li>
+                    ))}
+                  </ul>
+                );
+              }
+              if (isAcknowledgmentParagraph(block)) {
+                return (
+                  <div key={index} className="games-card games-disclaimer-highlight">
+                    <p className="games-section-copy games-disclaimer-highlight-copy">
+                      {renderInlineSegments(block.segments)}
+                    </p>
+                  </div>
+                );
+              }
+              return (
+                <p key={index} className="games-section-copy">
+                  {renderInlineSegments(block.segments)}
+                </p>
+              );
+            })
             : null}
         </div>
 
