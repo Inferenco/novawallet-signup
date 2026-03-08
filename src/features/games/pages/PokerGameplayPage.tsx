@@ -938,7 +938,9 @@ function PokerGameplayContent({ tableAddress }: PokerGameplayContentProps) {
                     <>
                       <span className={`games-wallet-seat-name ${isFolded ? "muted" : ""}`}>{seatName}</span>
                       <span className={`games-wallet-seat-stack ${isFolded ? "muted" : ""}`}>
-                        <img src={CHIP_IMAGE_URL} alt="" aria-hidden />
+                        <span className="games-chip-medallion games-chip-medallion-xs" aria-hidden="true">
+                          <img src={CHIP_IMAGE_URL} alt="" />
+                        </span>
                         {formatChips(seat.chipCount)}
                       </span>
                       {isAllIn && <span className="games-wallet-seat-allin">ALL-IN</span>}
@@ -947,7 +949,9 @@ function PokerGameplayContent({ tableAddress }: PokerGameplayContentProps) {
 
                   {shouldShowBet && (
                     <span className="games-wallet-seat-bet">
-                      <img src={CHIP_IMAGE_URL} alt="" aria-hidden />
+                      <span className="games-chip-medallion games-chip-medallion-xs" aria-hidden="true">
+                        <img src={CHIP_IMAGE_URL} alt="" />
+                      </span>
                       {formatChips(seat.currentBet)}
                     </span>
                   )}

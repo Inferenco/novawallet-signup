@@ -181,9 +181,9 @@ export function WalletProvider({ children }: PropsWithChildren) {
         network: walletCore.network,
         wallet: walletCore.wallet
           ? {
-              name: walletCore.wallet.name,
-              icon: walletCore.wallet.icon ?? null
-            }
+            name: walletCore.wallet.name,
+            icon: walletCore.wallet.icon ?? null
+          }
           : null
       }));
     };
@@ -246,9 +246,9 @@ export function WalletProvider({ children }: PropsWithChildren) {
         connecting: false,
         wallet: walletCore.wallet
           ? {
-              name: walletCore.wallet.name,
-              icon: walletCore.wallet.icon ?? null
-            }
+            name: walletCore.wallet.name,
+            icon: walletCore.wallet.icon ?? null
+          }
           : null,
         network: walletCore.network
       }));

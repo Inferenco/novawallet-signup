@@ -1181,10 +1181,9 @@
   color: #d6e5f5;
 }
 
-.games-wallet-seat-stack img {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
+.games-wallet-seat-stack .games-chip-medallion {
+  --games-chip-medallion-size: 16px;
+  --games-chip-image-size: 10px;
 }
 
 .games-wallet-seat-name.muted,
@@ -1217,10 +1216,9 @@
   gap: 4px;
 }
 
-.games-wallet-seat-bet img {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
+.games-wallet-seat-bet .games-chip-medallion {
+  --games-chip-medallion-size: 14px;
+  --games-chip-image-size: 9px;
 }
 
 .games-wallet-seat.active .games-wallet-seat-circle {
@@ -2078,12 +2076,6 @@
 
 .games-wallet-seat-stack {
   background: rgba(255, 255, 255, 0.05);
-}
-
-.games-wallet-seat-stack img,
-.games-wallet-seat-bet img {
-  width: 14px;
-  height: 14px;
 }
 
 .games-wallet-seat-bet {
