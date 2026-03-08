@@ -87,7 +87,7 @@ export function GamesHubPage() {
 
   return (
     <section className="games-screen">
-      <GamesTopBar title="Gaming" rightSlot={<WalletButton />} />
+      <GamesTopBar title="Gaming" backTo="/" rightSlot={<WalletButton />} />
 
       {isLoading ? (
         <div className="games-loading-screen">
