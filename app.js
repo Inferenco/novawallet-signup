@@ -52,7 +52,7 @@ function Footer() {
     ),
     e(
       "div",
-      { style: { display: "flex", justifyContent: "center", marginTop: "24px", fontSize: "0.85rem" } },
+      { style: { display: "flex", justifyContent: "center", gap: "24px", marginTop: "24px", fontSize: "0.85rem" } },
       e(
         "a",
         {
@@ -62,6 +62,16 @@ function Footer() {
           onMouseOut: (e) => (e.target.style.color = "var(--ink-2)"),
         },
         "Privacy Policy"
+      ),
+      e(
+        "a",
+        {
+          href: "/terms.html",
+          style: { color: "var(--ink-2)", textDecoration: "none", transition: "color 0.2s ease" },
+          onMouseOver: (e) => (e.target.style.color = "var(--ink-0)"),
+          onMouseOut: (e) => (e.target.style.color = "var(--ink-2)"),
+        },
+        "Terms of Service"
       )
     )
   );
