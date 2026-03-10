@@ -112,6 +112,143 @@
   width: min(100%, 400px);
 }
 
+.games-overlay-commit {
+  z-index: 48;
+  background:
+    radial-gradient(circle at 50% 28%, rgba(244, 213, 141, 0.14), transparent 30%),
+    linear-gradient(180deg, rgba(2, 6, 14, 0.8), rgba(2, 6, 14, 0.9));
+  backdrop-filter: blur(14px);
+}
+
+.games-commit-panel {
+  width: min(560px, calc(100vw - 24px));
+  max-height: none;
+  gap: 18px;
+  padding: clamp(22px, 2.8vw, 30px);
+  border-color: rgba(244, 213, 141, 0.2);
+  background:
+    linear-gradient(180deg, rgba(18, 24, 38, 0.99), rgba(7, 12, 22, 0.98)),
+    rgba(11, 16, 28, 0.98);
+  box-shadow:
+    0 32px 100px rgba(0, 0, 0, 0.64),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.games-commit-timeouted {
+  border-color: rgba(255, 128, 137, 0.24);
+}
+
+.games-commit-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.games-commit-phase {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.games-commit-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: rgba(244, 213, 141, 0.14);
+  border: 1px solid rgba(244, 213, 141, 0.24);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+}
+
+.games-commit-phase-label {
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(244, 245, 247, 0.68);
+}
+
+.games-commit-timer {
+  min-width: 76px;
+  min-height: 38px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: #f1f6fd;
+}
+
+.games-commit-timer.urgent {
+  color: #ffd7d7;
+  border-color: rgba(255, 128, 137, 0.32);
+  background: rgba(129, 22, 42, 0.34);
+}
+
+.games-commit-copy-wrap {
+  display: grid;
+  gap: 10px;
+}
+
+.games-commit-title {
+  margin: 0;
+  font-family: "Sora", "Manrope", sans-serif;
+  font-size: clamp(1.45rem, 2.6vw, 1.9rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: #f7fbff;
+}
+
+.games-commit-copy {
+  margin: 0;
+  font-size: 0.98rem;
+  line-height: 1.55;
+  color: rgba(224, 232, 241, 0.76);
+}
+
+.games-commit-copy.error {
+  color: #ffb5bf;
+}
+
+.games-commit-primary,
+.games-commit-danger {
+  width: 100%;
+  min-height: 52px;
+  border-radius: 16px;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.games-commit-primary {
+  background: linear-gradient(135deg, #f4d58d, #c79247);
+  color: #1d1406;
+  border: 1px solid rgba(244, 213, 141, 0.36);
+}
+
+.games-commit-primary:disabled {
+  opacity: 0.52;
+}
+
+.games-commit-danger {
+  border-color: rgba(255, 128, 137, 0.32);
+  background: rgba(110, 28, 40, 0.72);
+  color: #ffe6e9;
+}
+
+.games-commit-footnote {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  color: rgba(194, 204, 215, 0.72);
+}
+
 .games-chat-messages {
   max-height: 32vh;
   overflow: auto;
@@ -212,6 +349,20 @@
 @media (max-width: 639px) {
   .games-modal-panel {
     border-radius: 24px;
+  }
+
+  .games-commit-panel {
+    padding: 20px 18px;
+    gap: 16px;
+  }
+
+  .games-commit-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .games-commit-timer {
+    min-width: 0;
   }
 
   .games-disclaimer-scroll {

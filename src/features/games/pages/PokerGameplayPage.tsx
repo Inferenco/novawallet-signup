@@ -43,8 +43,10 @@ import { deriveThemeFromColor } from "../utils/theme";
 import { ChatProvider, useChatContext } from "../context/chat";
 import { AbortVoteModal } from "../components/poker/AbortVoteModal";
 import { ChatPanel } from "../components/poker/ChatPanel";
+import { CommitRevealOverlay } from "../components/poker/CommitRevealOverlay";
 import { JoinTableModal } from "../components/poker/JoinTableModal";
 import { ShowdownModal } from "../components/poker/ShowdownModal";
+import { deriveGameplayTimerState } from "../utils/poker/timers";
 import "../styles/games.css";
 
 const NORMAL_POLL = 3000;
@@ -170,7 +172,7 @@ function PokerGameplayContent({ tableAddress }: PokerGameplayContentProps) {
   const [newBigBlind, setNewBigBlind] = useState("");
   const [newMinBuyIn, setNewMinBuyIn] = useState("");
   const [newMaxBuyIn, setNewMaxBuyIn] = useState("");
-  const [nowMs, setNowMs] = useState(0);
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const [failedAvatarUrls, setFailedAvatarUrls] = useState<Set<string>>(new Set());
   const routeReadyForErrorsRef = useRef(false);
   const [showdownData, setShowdownData] = useState<ShowdownState>({
@@ -280,14 +282,10 @@ function PokerGameplayContent({ tableAddress }: PokerGameplayContentProps) {
   }, [isAdmin, setIsTableOwner]);
 
   useEffect(() => {
-    const initializeId = window.setTimeout(() => {
-      setNowMs(Date.now());
-    }, 0);
     const id = window.setInterval(() => {
       setNowMs(Date.now());
     }, 1000);
     return () => {
-      window.clearTimeout(initializeId);
       window.clearInterval(id);
     };
   }, []);
@@ -686,15 +684,30 @@ function PokerGameplayContent({ tableAddress }: PokerGameplayContentProps) {
     return PHASE_NAMES[phase] || `Phase ${phase}`;
   }, [summary?.isPaused, needsCommit, needsReveal, phase, activeSeatCount, isMyTurn, actionInfo?.playerAddr]);
 
-  const timerSeconds = useMemo(() => {
-    if (needsCommit && commitDeadline > 0) {
-      return Math.max(0, Math.floor((commitDeadline * 1000 - nowMs) / 1000));
-    }
-    if (needsReveal && revealDeadline > 0) {
-      return Math.max(0, Math.floor((revealDeadline * 1000 - nowMs) / 1000));
-    }
-    return null;
-  }, [commitDeadline, needsCommit, needsReveal, nowMs, revealDeadline]);
+  const timerState = useMemo(
+    () =>
+      deriveGameplayTimerState({
+        nowMs,
+        needsCommit,
+        needsReveal,
+        commitDeadline,
+        revealDeadline,
+        actionDeadline: actionInfo?.deadline ?? null
+      }),
+    [actionInfo?.deadline, commitDeadline, needsCommit, needsReveal, nowMs, revealDeadline]
+  );
+
+  const overlayVisible = mySeatIndex !== null && (needsCommit || needsReveal);
+
+  useEffect(() => {
+    if (!overlayVisible) return;
+    const id = window.setTimeout(() => {
+      setShowChat(false);
+      setShowOwnerPanel(false);
+      setShowAbortPanel(false);
+    }, 0);
+    return () => window.clearTimeout(id);
+  }, [overlayVisible]);
 
   const pendingActionCopy = useMemo(() => {
     if (tableActions.pendingAction || bettingActions.pendingAction || ownerActions.pendingAction || abortVote.isPending) {
@@ -725,6 +738,21 @@ function PokerGameplayContent({ tableAddress }: PokerGameplayContentProps) {
 
   const buyInBbMin = summary?.bigBlind ? Math.floor(summary.minBuyIn / summary.bigBlind) : 0;
   const buyInBbMax = summary?.bigBlind ? Math.floor(summary.maxBuyIn / summary.bigBlind) : 0;
+
+  const handleCommitPrompt = useCallback(() => {
+    void runAction(async (activeSigner) => commitReveal.commit(activeSigner));
+  }, [commitReveal, runAction]);
+
+  const handleRevealPrompt = useCallback(() => {
+    void runAction(async (activeSigner) => commitReveal.reveal(activeSigner));
+  }, [commitReveal, runAction]);
+
+  const handleTimeoutAction = useCallback(() => {
+    void runAction(
+      (activeSigner) => timeoutHandler.callTimeout(activeSigner),
+      { lockOnSuccess: true }
+    );
+  }, [runAction, timeoutHandler]);
 
   if (!tableAddress) {
     return (
@@ -801,43 +829,29 @@ function PokerGameplayContent({ tableAddress }: PokerGameplayContentProps) {
         <div className={`games-wallet-status-bar ${isMyTurn ? "active" : ""}`}>
           <p className="m-0">• {statusMessage}</p>
           <div className="games-wallet-status-actions">
-            {needsCommit && (
-              <button
-                type="button"
-                className="games-wallet-mini-btn games-wallet-mini-btn-accent"
-                onClick={() =>
-                  void runAction(async (activeSigner) => commitReveal.commit(activeSigner))
-                }
-              >
-                Request
-              </button>
-            )}
-            {needsReveal && (
-              <button
-                type="button"
-                className="games-wallet-mini-btn games-wallet-mini-btn-accent"
-                onClick={() =>
-                  void runAction(async (activeSigner) => commitReveal.reveal(activeSigner))
-                }
-              >
-                Accept
-              </button>
-            )}
             <button
               type="button"
               className="games-wallet-mini-btn games-wallet-mini-btn-danger"
-              disabled={!timeoutHandler.canCallTimeout}
-              onClick={() =>
-                void runAction(
-                  (activeSigner) => timeoutHandler.callTimeout(activeSigner),
-                  { lockOnSuccess: true }
-                )
-              }
+              disabled={!timeoutHandler.canCallTimeout || timeoutHandler.isPending}
+              onClick={handleTimeoutAction}
             >
-              Timeout
+              {timeoutHandler.isPending ? "Timing out..." : "Timeout"}
             </button>
           </div>
         </div>
+
+        <CommitRevealOverlay
+          visible={overlayVisible}
+          phase={needsCommit ? "commit" : "reveal"}
+          secondsRemaining={timerState.secondsRemaining ?? 0}
+          status={commitReveal.status}
+          error={commitReveal.error}
+          canCallTimeout={timeoutHandler.canCallTimeout}
+          timeoutPending={timeoutHandler.isPending}
+          onCommit={handleCommitPrompt}
+          onReveal={handleRevealPrompt}
+          onTimeout={handleTimeoutAction}
+        />
 
         {!contractsReady && (
           <div className="games-wallet-config-warning">
@@ -962,8 +976,8 @@ function PokerGameplayContent({ tableAddress }: PokerGameplayContentProps) {
         </section>
 
         <div className="games-wallet-info-row">
-          <span className={`games-wallet-timer ${timerSeconds !== null && timerSeconds <= 10 ? "urgent" : ""}`}>
-            {formatTimer(timerSeconds)}
+          <span className={`games-wallet-timer ${timerState.isUrgent ? "urgent" : ""}`}>
+            {formatTimer(timerState.secondsRemaining)}
           </span>
           <span>{PHASE_NAMES[phase] || "Waiting"}</span>
           <span>Hand #{tableState?.handNumber || 0}</span>

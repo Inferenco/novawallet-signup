@@ -2074,6 +2074,12 @@
   background: rgba(255, 255, 255, 0.04);
 }
 
+.games-wallet-right-panel {
+  width: 100%;
+  display: grid;
+  gap: 14px;
+}
+
 .games-wallet-waiting-controls {
   grid-template-columns: minmax(0, 1fr) minmax(120px, auto);
   gap: 12px;
@@ -2270,66 +2276,25 @@
 
 @media (min-width: 1180px) {
   .games-gameplay-wrap-wallet {
-    grid-template-columns: minmax(0, 1.65fr) minmax(340px, 0.92fr);
-    grid-template-areas:
-      "header header"
-      "status status"
-      "warning warning"
-      "table controls"
-      "info controls";
-    align-items: start;
-    gap: 20px 24px;
-  }
-
-  .games-gameplay-wrap-wallet>.games-wallet-header {
-    grid-area: header;
-  }
-
-  .games-gameplay-wrap-wallet>.games-wallet-status-bar {
-    grid-area: status;
-  }
-
-  .games-gameplay-wrap-wallet>.games-wallet-config-warning {
-    grid-area: warning;
-  }
-
-  .games-gameplay-wrap-wallet>.games-wallet-table-section {
-    grid-area: table;
-  }
-
-  .games-gameplay-wrap-wallet>.games-wallet-info-row {
-    grid-area: info;
-  }
-
-  .games-gameplay-wrap-wallet>.games-wallet-right-panel {
-    grid-area: controls;
-    align-self: start;
-    position: sticky;
-    top: 108px;
-    bottom: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-  }
-
-  .games-gameplay-wrap-wallet>.games-wallet-right-panel .games-wallet-waiting-controls {
-    grid-template-columns: 1fr;
+    max-width: 1320px;
+    margin: 0 auto;
+    gap: 18px;
   }
 
   .games-wallet-table-section {
-    min-height: 620px;
-    padding: 18px;
+    min-height: 640px;
+    padding: 18px 18px 16px;
   }
 
   .games-wallet-table-canvas {
-    min-height: 560px;
+    min-height: 585px;
   }
 
   .games-wallet-table-outer {
-    left: 10%;
-    right: 10%;
-    top: 114px;
-    height: 320px;
+    left: 11%;
+    right: 11%;
+    top: 100px;
+    height: 340px;
   }
 
   .games-wallet-card {
@@ -2343,26 +2308,54 @@
   }
 
   .games-wallet-seat-top-left {
-    left: 17%;
-    top: 66px;
+    left: 18%;
+    top: 52px;
   }
 
   .games-wallet-seat-top-right {
-    right: 17%;
-    top: 66px;
+    right: 18%;
+    top: 52px;
   }
 
   .games-wallet-seat-left {
-    left: 8%;
-    top: 244px;
+    left: 10%;
+    top: 242px;
   }
 
   .games-wallet-seat-right {
-    right: 8%;
-    top: 244px;
+    right: 10%;
+    top: 242px;
   }
 
   .games-wallet-seat-bottom {
-    bottom: 18px;
+    bottom: 26px;
+  }
+
+  .games-wallet-info-row,
+  .games-wallet-right-panel {
+    max-width: 980px;
+    margin: 0 auto;
+  }
+
+  .games-wallet-right-panel {
+    gap: 18px;
+  }
+
+  .games-wallet-right-panel .games-wallet-waiting-controls {
+    max-width: 560px;
+  }
+
+  .games-wallet-hero-bar {
+    padding: 18px;
+    gap: 14px;
+  }
+
+  .games-wallet-hero-top {
+    grid-template-columns: minmax(0, 1.1fr) auto minmax(190px, 240px);
+    gap: 18px;
+  }
+
+  .games-wallet-action-row {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
