@@ -62,9 +62,15 @@
 .games-disclaimer-scroll {
   max-height: min(52vh, 430px);
   overflow: auto;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 12px;
   padding-right: 6px;
+  padding-bottom: 24px;
+}
+
+.games-disclaimer-scroll>* {
+  flex-shrink: 0;
 }
 
 .games-disclaimer-scroll::-webkit-scrollbar {
@@ -210,5 +216,6 @@
 
   .games-disclaimer-scroll {
     max-height: 48vh;
+    padding-bottom: 32px;
   }
 }

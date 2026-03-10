@@ -969,257 +969,259 @@ function PokerGameplayContent({ tableAddress }: PokerGameplayContentProps) {
           <span>Hand #{tableState?.handNumber || 0}</span>
         </div>
 
-        {phase === GAME_PHASES.WAITING && mySeatIndex !== null && (
-          <div className="games-wallet-waiting-controls">
-            <button
-              type="button"
-              className="games-wallet-start-btn"
-              disabled={!canStartHand}
-              onClick={() => void runAction((activeSigner) => tableActions.doStartHand(activeSigner))}
-            >
-              Start Hand
-            </button>
-            <button
-              type="button"
-              className="games-wallet-leave-btn"
-              onClick={() => void runAction((activeSigner) => tableActions.doLeave(activeSigner))}
-            >
-              Leave
-            </button>
-          </div>
-        )}
+        <div className="games-wallet-right-panel">
+          {phase === GAME_PHASES.WAITING && mySeatIndex !== null && (
+            <div className="games-wallet-waiting-controls">
+              <button
+                type="button"
+                className="games-wallet-start-btn"
+                disabled={!canStartHand}
+                onClick={() => void runAction((activeSigner) => tableActions.doStartHand(activeSigner))}
+              >
+                Start Hand
+              </button>
+              <button
+                type="button"
+                className="games-wallet-leave-btn"
+                onClick={() => void runAction((activeSigner) => tableActions.doLeave(activeSigner))}
+              >
+                Leave
+              </button>
+            </div>
+          )}
 
-        {mySeatIndex === null && (
-          <div className="games-wallet-waiting-controls">
-            <button
-              type="button"
-              className="games-wallet-start-btn"
-              disabled={chipActions.chipBalance <= 0 || !summary || summary.occupiedSeats >= summary.totalSeats}
-              onClick={() => setShowJoinModal(true)}
-            >
-              {chipActions.chipBalance <= 0 ? "No Chips" : "Join Table"}
-            </button>
-            <Link className="games-wallet-leave-btn" to="/games/poker">
-              Back
-            </Link>
-          </div>
-        )}
+          {mySeatIndex === null && (
+            <div className="games-wallet-waiting-controls">
+              <button
+                type="button"
+                className="games-wallet-start-btn"
+                disabled={chipActions.chipBalance <= 0 || !summary || summary.occupiedSeats >= summary.totalSeats}
+                onClick={() => setShowJoinModal(true)}
+              >
+                {chipActions.chipBalance <= 0 ? "No Chips" : "Join Table"}
+              </button>
+              <Link className="games-wallet-leave-btn" to="/games/poker">
+                Back
+              </Link>
+            </div>
+          )}
 
-        {mySeatIndex !== null && (
-          <section className="games-wallet-hero-bar">
-            <div className="games-wallet-hero-top">
-              <div className="games-wallet-hero-summary">
-                <span className={`games-wallet-hero-avatar ${isMyTurn ? "active" : ""}`}>
-                  {myProfile?.avatarUrl && !myAvatarBlocked ? (
-                    <img
-                      src={myProfile.avatarUrl}
-                      alt={myProfile.nickname || "Hero"}
-                      onError={() => {
-                        setFailedAvatarUrls((current) => {
-                          const next = new Set(current);
-                          next.add(myProfile.avatarUrl as string);
-                          return next;
-                        });
-                      }}
-                    />
-                  ) : (
-                    <span>{(myProfile?.nickname || "H").slice(0, 1).toUpperCase()}</span>
-                  )}
-                </span>
-                <div>
-                  <p className="m-0 games-wallet-hero-label">MY STACK</p>
-                  <p className="m-0 games-wallet-hero-value">{formatChips(myStack)}</p>
+          {mySeatIndex !== null && (
+            <section className="games-wallet-hero-bar">
+              <div className="games-wallet-hero-top">
+                <div className="games-wallet-hero-summary">
+                  <span className={`games-wallet-hero-avatar ${isMyTurn ? "active" : ""}`}>
+                    {myProfile?.avatarUrl && !myAvatarBlocked ? (
+                      <img
+                        src={myProfile.avatarUrl}
+                        alt={myProfile.nickname || "Hero"}
+                        onError={() => {
+                          setFailedAvatarUrls((current) => {
+                            const next = new Set(current);
+                            next.add(myProfile.avatarUrl as string);
+                            return next;
+                          });
+                        }}
+                      />
+                    ) : (
+                      <span>{(myProfile?.nickname || "H").slice(0, 1).toUpperCase()}</span>
+                    )}
+                  </span>
+                  <div>
+                    <p className="m-0 games-wallet-hero-label">MY STACK</p>
+                    <p className="m-0 games-wallet-hero-value">{formatChips(myStack)}</p>
+                  </div>
+                </div>
+
+                <div className="games-wallet-hero-cards">
+                  {[0, 1].map((idx) => {
+                    const card = myHoleCards[idx];
+                    const hidden = card === undefined || !myCardsDecrypted;
+                    return (
+                      <span key={idx} className={`games-wallet-card small ${hidden ? "face-down" : ""}`}>
+                        {hidden ? "♠" : formatCard(card)}
+                      </span>
+                    );
+                  })}
+                </div>
+
+                <div className="games-wallet-raise-box">
+                  <label htmlFor="raise-input">RAISE TO</label>
+                  <input
+                    id="raise-input"
+                    className="games-wallet-text-input"
+                    value={raiseToAmount}
+                    onChange={(event) => {
+                      setRaiseToAmount(event.target.value);
+                      const parsed = Number.parseInt(event.target.value, 10);
+                      if (Number.isFinite(parsed)) {
+                        syncRatioFromRaise(parsed);
+                      }
+                    }}
+                    placeholder={`${minRaiseTo}`}
+                  />
                 </div>
               </div>
 
-              <div className="games-wallet-hero-cards">
-                {[0, 1].map((idx) => {
-                  const card = myHoleCards[idx];
-                  const hidden = card === undefined || !myCardsDecrypted;
-                  return (
-                    <span key={idx} className={`games-wallet-card small ${hidden ? "face-down" : ""}`}>
-                      {hidden ? "♠" : formatCard(card)}
-                    </span>
-                  );
-                })}
-              </div>
-
-              <div className="games-wallet-raise-box">
-                <label htmlFor="raise-input">RAISE TO</label>
+              <div className="games-wallet-raise-controls">
+                <div className="games-wallet-preset-row">
+                  <button
+                    type="button"
+                    className="games-wallet-preset-btn"
+                    onClick={() => setRaisePreset(0)}
+                    disabled={!inBettingRound || !isMyTurn || actionLocked}
+                  >
+                    MIN
+                  </button>
+                  <button
+                    type="button"
+                    className="games-wallet-preset-btn"
+                    onClick={() => setRaisePreset(50)}
+                    disabled={!inBettingRound || !isMyTurn || actionLocked}
+                  >
+                    50%
+                  </button>
+                  <button
+                    type="button"
+                    className="games-wallet-preset-btn"
+                    onClick={() => setRaisePreset(100)}
+                    disabled={!inBettingRound || !isMyTurn || actionLocked}
+                  >
+                    MAX
+                  </button>
+                </div>
                 <input
-                  id="raise-input"
-                  className="games-wallet-text-input"
-                  value={raiseToAmount}
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={raiseRatio}
+                  className="games-wallet-raise-slider"
+                  disabled={!inBettingRound || !isMyTurn || maxRaiseTo <= minRaiseTo || actionLocked}
                   onChange={(event) => {
-                    setRaiseToAmount(event.target.value);
-                    const parsed = Number.parseInt(event.target.value, 10);
-                    if (Number.isFinite(parsed)) {
-                      syncRatioFromRaise(parsed);
-                    }
+                    const ratio = Number.parseInt(event.target.value, 10);
+                    setRaiseRatio(ratio);
+                    setRaiseToAmount(String(calculateRaiseFromRatio(ratio)));
                   }}
-                  placeholder={`${minRaiseTo}`}
                 />
               </div>
-            </div>
 
-            <div className="games-wallet-raise-controls">
-              <div className="games-wallet-preset-row">
+              <div className="games-wallet-action-row">
                 <button
                   type="button"
-                  className="games-wallet-preset-btn"
-                  onClick={() => setRaisePreset(0)}
-                  disabled={!inBettingRound || !isMyTurn || actionLocked}
+                  className="games-wallet-action-btn fold"
+                  disabled={!isMyTurn || !inBettingRound || actionLocked}
+                  onClick={() =>
+                    void runAction(
+                      (activeSigner) => bettingActions.doFold(activeSigner),
+                      { lockOnSuccess: true }
+                    )
+                  }
                 >
-                  MIN
+                  Fold
                 </button>
                 <button
                   type="button"
-                  className="games-wallet-preset-btn"
-                  onClick={() => setRaisePreset(50)}
-                  disabled={!inBettingRound || !isMyTurn || actionLocked}
+                  className="games-wallet-action-btn check"
+                  disabled={!isMyTurn || !inBettingRound || !canCheck || actionLocked}
+                  onClick={() =>
+                    void runAction(
+                      (activeSigner) => bettingActions.doCheck(activeSigner),
+                      { lockOnSuccess: true }
+                    )
+                  }
                 >
-                  50%
+                  Check
                 </button>
                 <button
                   type="button"
-                  className="games-wallet-preset-btn"
-                  onClick={() => setRaisePreset(100)}
-                  disabled={!inBettingRound || !isMyTurn || actionLocked}
+                  className="games-wallet-action-btn call"
+                  disabled={!isMyTurn || !inBettingRound || canCheck || actionLocked}
+                  onClick={() =>
+                    void runAction(
+                      (activeSigner) => bettingActions.doCall(activeSigner),
+                      { lockOnSuccess: true }
+                    )
+                  }
                 >
-                  MAX
+                  Call {formatChips(callAmount)}
+                </button>
+                <button
+                  type="button"
+                  className="games-wallet-action-btn raise"
+                  disabled={!isMyTurn || !inBettingRound || actionLocked}
+                  onClick={() => {
+                    const parsed = Number.parseInt(raiseToAmount, 10);
+                    if (!Number.isFinite(parsed) || parsed <= 0) {
+                      pushToast("error", "Enter a valid raise amount.");
+                      return;
+                    }
+                    if (parsed < minRaiseTo) {
+                      pushToast("error", `Raise must be at least ${formatChips(minRaiseTo)}.`);
+                      return;
+                    }
+                    void runAction(
+                      (activeSigner) => bettingActions.doRaise(activeSigner, BigInt(parsed)),
+                      { lockOnSuccess: true }
+                    );
+                  }}
+                >
+                  Raise
                 </button>
               </div>
-              <input
-                type="range"
-                min={0}
-                max={100}
-                value={raiseRatio}
-                className="games-wallet-raise-slider"
-                disabled={!inBettingRound || !isMyTurn || maxRaiseTo <= minRaiseTo || actionLocked}
-                onChange={(event) => {
-                  const ratio = Number.parseInt(event.target.value, 10);
-                  setRaiseRatio(ratio);
-                  setRaiseToAmount(String(calculateRaiseFromRatio(ratio)));
-                }}
-              />
-            </div>
 
-            <div className="games-wallet-action-row">
-              <button
-                type="button"
-                className="games-wallet-action-btn fold"
-                disabled={!isMyTurn || !inBettingRound || actionLocked}
-                onClick={() =>
-                  void runAction(
-                    (activeSigner) => bettingActions.doFold(activeSigner),
-                    { lockOnSuccess: true }
-                  )
-                }
-              >
-                Fold
-              </button>
-              <button
-                type="button"
-                className="games-wallet-action-btn check"
-                disabled={!isMyTurn || !inBettingRound || !canCheck || actionLocked}
-                onClick={() =>
-                  void runAction(
-                    (activeSigner) => bettingActions.doCheck(activeSigner),
-                    { lockOnSuccess: true }
-                  )
-                }
-              >
-                Check
-              </button>
-              <button
-                type="button"
-                className="games-wallet-action-btn call"
-                disabled={!isMyTurn || !inBettingRound || canCheck || actionLocked}
-                onClick={() =>
-                  void runAction(
-                    (activeSigner) => bettingActions.doCall(activeSigner),
-                    { lockOnSuccess: true }
-                  )
-                }
-              >
-                Call {formatChips(callAmount)}
-              </button>
-              <button
-                type="button"
-                className="games-wallet-action-btn raise"
-                disabled={!isMyTurn || !inBettingRound || actionLocked}
-                onClick={() => {
-                  const parsed = Number.parseInt(raiseToAmount, 10);
-                  if (!Number.isFinite(parsed) || parsed <= 0) {
-                    pushToast("error", "Enter a valid raise amount.");
-                    return;
+              <div className="games-wallet-subaction-row">
+                <button
+                  type="button"
+                  className="games-wallet-link-btn danger"
+                  disabled={!isMyTurn || !inBettingRound || actionLocked}
+                  onClick={() =>
+                    void runAction(
+                      (activeSigner) => bettingActions.doAllIn(activeSigner),
+                      { lockOnSuccess: true }
+                    )
                   }
-                  if (parsed < minRaiseTo) {
-                    pushToast("error", `Raise must be at least ${formatChips(minRaiseTo)}.`);
-                    return;
+                >
+                  ALL-IN ({formatChips(myStack)})
+                </button>
+                <button
+                  type="button"
+                  className="games-wallet-link-btn"
+                  disabled={!canStraddle || actionLocked}
+                  onClick={() =>
+                    void runAction(
+                      (activeSigner) => bettingActions.doStraddle(activeSigner),
+                      { lockOnSuccess: true }
+                    )
                   }
-                  void runAction(
-                    (activeSigner) => bettingActions.doRaise(activeSigner, BigInt(parsed)),
-                    { lockOnSuccess: true }
-                  );
-                }}
-              >
-                Raise
-              </button>
-            </div>
-
-            <div className="games-wallet-subaction-row">
-              <button
-                type="button"
-                className="games-wallet-link-btn danger"
-                disabled={!isMyTurn || !inBettingRound || actionLocked}
-                onClick={() =>
-                  void runAction(
-                    (activeSigner) => bettingActions.doAllIn(activeSigner),
-                    { lockOnSuccess: true }
-                  )
-                }
-              >
-                ALL-IN ({formatChips(myStack)})
-              </button>
-              <button
-                type="button"
-                className="games-wallet-link-btn"
-                disabled={!canStraddle || actionLocked}
-                onClick={() =>
-                  void runAction(
-                    (activeSigner) => bettingActions.doStraddle(activeSigner),
-                    { lockOnSuccess: true }
-                  )
-                }
-              >
-                Straddle
-              </button>
-              <button
-                type="button"
-                className="games-wallet-link-btn"
-                onClick={() => void runAction((activeSigner) => tableActions.doSitOut(activeSigner))}
-              >
-                Sit Out
-              </button>
-              <button
-                type="button"
-                className="games-wallet-link-btn"
-                onClick={() => void runAction((activeSigner) => tableActions.doSitIn(activeSigner))}
-              >
-                Sit In
-              </button>
-              <button
-                type="button"
-                className="games-wallet-link-btn"
-                onClick={() => setShowAbortPanel(true)}
-              >
-                Abort
-              </button>
-              <span className="games-wallet-pending-copy">{pendingActionCopy}</span>
-            </div>
-          </section>
-        )}
+                >
+                  Straddle
+                </button>
+                <button
+                  type="button"
+                  className="games-wallet-link-btn"
+                  onClick={() => void runAction((activeSigner) => tableActions.doSitOut(activeSigner))}
+                >
+                  Sit Out
+                </button>
+                <button
+                  type="button"
+                  className="games-wallet-link-btn"
+                  onClick={() => void runAction((activeSigner) => tableActions.doSitIn(activeSigner))}
+                >
+                  Sit In
+                </button>
+                <button
+                  type="button"
+                  className="games-wallet-link-btn"
+                  onClick={() => setShowAbortPanel(true)}
+                >
+                  Abort
+                </button>
+                <span className="games-wallet-pending-copy">{pendingActionCopy}</span>
+              </div>
+            </section>
+          )}
+        </div>
       </div>
 
       {showOwnerPanel && isAdmin && summary && (

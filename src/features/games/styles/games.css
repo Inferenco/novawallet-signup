@@ -375,11 +375,9 @@
   border-radius: 180px;
   background:
     linear-gradient(140deg, rgba(111, 77, 43, 0.95), rgba(53, 34, 18, 0.95)),
-    repeating-linear-gradient(
-      45deg,
+    repeating-linear-gradient(45deg,
       rgba(255, 255, 255, 0.03) 0 6px,
-      rgba(0, 0, 0, 0.03) 6px 12px
-    );
+      rgba(0, 0, 0, 0.03) 6px 12px);
   border: 1px solid rgba(255, 255, 255, 0.12);
   box-shadow:
     0 26px 48px rgba(0, 0, 0, 0.4),
@@ -393,11 +391,9 @@
   border: 3px solid color-mix(in srgb, var(--poker-rail, #1a5070) 70%, #23170f);
   background:
     radial-gradient(circle at 50% 15%, color-mix(in srgb, var(--poker-felt, #0f3a50) 88%, #fff), var(--poker-felt-dark, #0f3a50)),
-    repeating-radial-gradient(
-      circle at center,
+    repeating-radial-gradient(circle at center,
       rgba(255, 255, 255, 0.03) 0 2px,
-      rgba(0, 0, 0, 0.03) 2px 4px
-    );
+      rgba(0, 0, 0, 0.03) 2px 4px);
   position: relative;
   display: grid;
   place-items: center;
@@ -455,11 +451,9 @@
 .games-playing-card.face-down {
   background:
     linear-gradient(145deg, rgba(36, 79, 119, 0.88), rgba(17, 43, 78, 0.94)),
-    repeating-linear-gradient(
-      45deg,
+    repeating-linear-gradient(45deg,
       rgba(255, 255, 255, 0.07) 0 5px,
-      rgba(0, 0, 0, 0.07) 5px 10px
-    );
+      rgba(0, 0, 0, 0.07) 5px 10px);
   border-color: rgba(124, 172, 220, 0.38);
   color: transparent;
 }
@@ -762,7 +756,7 @@
     justify-items: start;
   }
 
-.games-poker-hero-actions {
+  .games-poker-hero-actions {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
@@ -775,17 +769,13 @@
   overflow: hidden;
   min-height: 100vh;
   background:
-    radial-gradient(
-      90% 60% at 50% -10%,
+    radial-gradient(90% 60% at 50% -10%,
       color-mix(in srgb, var(--poker-felt, #1f4d2b) 56%, transparent),
-      transparent 70%
-    ),
-    linear-gradient(
-      180deg,
+      transparent 70%),
+    linear-gradient(180deg,
       color-mix(in srgb, var(--poker-felt-dark, #1c4124) 82%, #04120a),
       #020706 58%,
-      #020304 100%
-    );
+      #020304 100%);
 }
 
 .games-gameplay-shell-wallet::before {
@@ -956,11 +946,9 @@
   border-radius: 18px;
   border: 1px solid color-mix(in srgb, var(--poker-accent, #2fbf71) 28%, rgba(255, 255, 255, 0.18));
   background:
-    radial-gradient(
-      70% 60% at 50% 30%,
+    radial-gradient(70% 60% at 50% 30%,
       color-mix(in srgb, var(--poker-felt, #286742) 56%, rgba(8, 14, 18, 0.2)),
-      rgba(1, 7, 10, 0.4)
-    ),
+      rgba(1, 7, 10, 0.4)),
     linear-gradient(180deg, rgba(3, 14, 20, 0.82), rgba(1, 8, 12, 0.9));
   padding: 10px 8px 8px;
   min-height: 420px;
@@ -999,12 +987,10 @@
   border-radius: 170px;
   border: 3px solid #2d1b0e;
   background:
-    linear-gradient(
-      115deg,
+    linear-gradient(115deg,
       color-mix(in srgb, var(--poker-felt, #286742) 82%, rgba(255, 255, 255, 0.07)),
       color-mix(in srgb, var(--poker-rail, #133226) 86%, rgba(0, 0, 0, 0.25)),
-      color-mix(in srgb, var(--poker-felt, #286742) 82%, rgba(255, 255, 255, 0.07))
-    );
+      color-mix(in srgb, var(--poker-felt, #286742) 82%, rgba(255, 255, 255, 0.07)));
   display: grid;
   place-items: center;
   overflow: hidden;
@@ -1083,11 +1069,9 @@
 .games-wallet-card.face-down {
   background:
     linear-gradient(145deg, rgba(35, 84, 133, 0.94), rgba(14, 37, 68, 0.94)),
-    repeating-linear-gradient(
-      45deg,
+    repeating-linear-gradient(45deg,
       rgba(255, 255, 255, 0.08) 0 6px,
-      rgba(6, 12, 22, 0.08) 6px 12px
-    );
+      rgba(6, 12, 22, 0.08) 6px 12px);
   color: rgba(188, 213, 237, 0.38);
 }
 
@@ -1676,11 +1660,11 @@
   transition: transform 0.15s ease;
 }
 
-.games-wallet-switch input:checked + span {
+.games-wallet-switch input:checked+span {
   background: color-mix(in srgb, var(--poker-accent, #2fbf71) 56%, rgba(255, 255, 255, 0.15));
 }
 
-.games-wallet-switch input:checked + span::before {
+.games-wallet-switch input:checked+span::before {
   transform: translateX(20px);
 }
 
@@ -2287,31 +2271,48 @@
 @media (min-width: 1180px) {
   .games-gameplay-wrap-wallet {
     grid-template-columns: minmax(0, 1.65fr) minmax(340px, 0.92fr);
+    grid-template-areas:
+      "header header"
+      "status status"
+      "warning warning"
+      "table controls"
+      "info controls";
     align-items: start;
     gap: 20px 24px;
   }
 
-  .games-gameplay-wrap-wallet > .games-wallet-header,
-  .games-gameplay-wrap-wallet > .games-wallet-status-bar,
-  .games-gameplay-wrap-wallet > .games-wallet-config-warning {
-    grid-column: 1 / -1;
+  .games-gameplay-wrap-wallet>.games-wallet-header {
+    grid-area: header;
   }
 
-  .games-gameplay-wrap-wallet > .games-wallet-table-section,
-  .games-gameplay-wrap-wallet > .games-wallet-info-row {
-    grid-column: 1;
+  .games-gameplay-wrap-wallet>.games-wallet-status-bar {
+    grid-area: status;
   }
 
-  .games-gameplay-wrap-wallet > .games-wallet-waiting-controls,
-  .games-gameplay-wrap-wallet > .games-wallet-hero-bar {
-    grid-column: 2;
+  .games-gameplay-wrap-wallet>.games-wallet-config-warning {
+    grid-area: warning;
+  }
+
+  .games-gameplay-wrap-wallet>.games-wallet-table-section {
+    grid-area: table;
+  }
+
+  .games-gameplay-wrap-wallet>.games-wallet-info-row {
+    grid-area: info;
+  }
+
+  .games-gameplay-wrap-wallet>.games-wallet-right-panel {
+    grid-area: controls;
     align-self: start;
     position: sticky;
     top: 108px;
     bottom: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
   }
 
-  .games-gameplay-wrap-wallet > .games-wallet-waiting-controls {
+  .games-gameplay-wrap-wallet>.games-wallet-right-panel .games-wallet-waiting-controls {
     grid-template-columns: 1fr;
   }
 
