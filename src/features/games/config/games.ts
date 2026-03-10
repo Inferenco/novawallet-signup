@@ -59,7 +59,7 @@ export function buildFunctionId(
 }
 
 export const CHIP_IMAGE_URL =
-  "https://inferenco.github.io/useful-images/poker/Chip.png";
+  "/assets/games/chip.png";
 
 export const CHIPS_PER_TOKEN = 1000;
 export const BASE_UNITS_PER_CHIP = 100_000;

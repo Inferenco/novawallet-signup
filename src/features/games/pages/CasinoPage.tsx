@@ -19,12 +19,20 @@ import {
   getCurrentTerms,
   hasAcknowledgedCurrent
 } from "../services/consent";
+import { CHIP_IMAGE_URL } from "../config/games";
 import { formatChips } from "../services/poker/chips";
 import "../styles/casino.css";
 
 function isTermsError(message: string | null | undefined): boolean {
   const safe = String(message ?? "").toLowerCase();
   return safe.includes("terms") || safe.includes("acknowledge") || safe.includes("casino");
+}
+
+function formatCedraCompact(balance: number): string {
+  const raw = formatCedraFromOctas(BigInt(Math.max(balance, 0))).replace(/\s+CEDRA$/, "");
+  const [whole, decimal = ""] = raw.split(".");
+  const trimmed = decimal.slice(0, 3).replace(/0+$/, "");
+  return trimmed ? `${whole}.${trimmed}` : whole;
 }
 
 export function CasinoPage() {
@@ -154,13 +162,13 @@ export function CasinoPage() {
     const activeSigner = requireSigner();
     if (!activeSigner) return;
 
-      const success = await freeChips.doClaimFreeChips(activeSigner);
-      if (success) {
-        await Promise.all([
-          refreshChipBalance(),
-          refreshClaimStatus(),
-          refreshCedraBalance()
-        ]);
+    const success = await freeChips.doClaimFreeChips(activeSigner);
+    if (success) {
+      await Promise.all([
+        refreshChipBalance(),
+        refreshClaimStatus(),
+        refreshCedraBalance()
+      ]);
       pushToast("success", "Free chips claimed.");
       return;
     }
@@ -169,7 +177,6 @@ export function CasinoPage() {
       await openDisclaimerForRetry(handleClaim);
     }
   }, [
-    chipActions,
     freeChips,
     openDisclaimerForRetry,
     pushToast,
@@ -206,7 +213,6 @@ export function CasinoPage() {
     },
     [
       chipActions,
-      freeChips,
       openDisclaimerForRetry,
       pushToast,
       refreshChipBalance,
@@ -251,6 +257,7 @@ export function CasinoPage() {
 
     return `${chipActions.multiplierStatus.factor}x active`;
   }, [chipActions.multiplierStatus.factor, chipActions.multiplierStatus.isActive]);
+  const cedraDisplay = useMemo(() => formatCedraCompact(cedraBalance), [cedraBalance]);
 
   if (!wallet.connected) {
     return (
@@ -271,93 +278,154 @@ export function CasinoPage() {
 
       <div className="games-screen-scroll">
         <div className="games-screen-content">
-          <div className="games-card games-card-hero">
-            <div className="games-section">
-              <p className="games-section-kicker">Daily Rewards</p>
-              <h1 className="games-section-title games-casino-hero-title">Chips & Boosts</h1>
-              <p className="games-section-copy">
-                Claim periodic free chips, activate multipliers, and enter live poker tables.
-              </p>
-            </div>
-          </div>
-
-          {!hasConfiguredGameContracts() ? (
-            <div className="games-empty-state">
-              Configure `VITE_GAME_CONTRACT_ADDRESS` and the games wallet contract env vars to use
-              live casino actions.
-            </div>
-          ) : null}
-
-          <FreeChipsCard
-            dailyAmount={freeChips.dailyAmount}
-            boostedDailyAmount={freeChips.boostedDailyAmount}
-            multiplierFactor={freeChips.multiplierFactor}
-            multiplierTimeLeft={freeChips.multiplierTimeLeft}
-            canClaim={freeChips.canClaim}
-            timeUntilNext={freeChips.timeUntilNext}
-            isClaiming={freeChips.isClaiming}
-            error={freeChips.error}
-            onClaim={() => {
-              void handleClaim();
-            }}
-          />
-
-          <div className="games-card games-card-body games-section">
-            <div className="games-inline-row" style={{ justifyContent: "space-between" }}>
-              <div>
-                <p className="games-section-kicker">Boost Store</p>
-                <h2 className="games-section-title">Multiplier Upgrades</h2>
+          <div className="games-casino-dashboard">
+            {!hasConfiguredGameContracts() ? (
+              <div className="games-empty-state games-casino-config-warning">
+                Configure `VITE_GAME_CONTRACT_ADDRESS` and the games wallet contract env vars to use
+                live casino actions.
               </div>
-              <button
-                type="button"
-                className="games-button games-button-accent"
-                onClick={() => setShowBoostStore(true)}
-              >
-                Open Store
-              </button>
+            ) : null}
+
+            <div className="games-casino-column games-casino-column-primary">
+              <div className="games-card games-card-hero games-casino-hero-card">
+                <div className="games-section games-casino-hero-copy">
+                  <p className="games-section-kicker">Daily Rewards</p>
+                  <h1 className="games-section-title games-casino-hero-title">Chips & Boosts</h1>
+                  <p className="games-section-copy">
+                    Claim periodic free chips, activate multipliers, and step into live poker tables
+                    from one polished casino floor.
+                  </p>
+                </div>
+                <div className="games-casino-hero-pills" aria-label="Casino highlights">
+                  <span>Daily claim cycle</span>
+                  <span>{boostSummary}</span>
+                  <span>{formatChips(chipActions.chipBalance)} chips ready</span>
+                </div>
+              </div>
+
+              <div className="games-casino-primary-column">
+                <FreeChipsCard
+                  dailyAmount={freeChips.dailyAmount}
+                  boostedDailyAmount={freeChips.boostedDailyAmount}
+                  multiplierFactor={freeChips.multiplierFactor}
+                  multiplierTimeLeft={freeChips.multiplierTimeLeft}
+                  canClaim={freeChips.canClaim}
+                  timeUntilNext={freeChips.timeUntilNext}
+                  isClaiming={freeChips.isClaiming}
+                  error={freeChips.error}
+                  onClaim={() => {
+                    void handleClaim();
+                  }}
+                />
+
+                <div className="games-card games-card-body games-section games-casino-store-card">
+                  <div className="games-casino-section-head">
+                    <div>
+                      <p className="games-section-kicker">Boost Store</p>
+                      <h2 className="games-section-title">Multiplier Upgrades</h2>
+                    </div>
+                    <button
+                      type="button"
+                      className="games-button games-button-accent"
+                      onClick={() => setShowBoostStore(true)}
+                    >
+                      Open Store
+                    </button>
+                  </div>
+
+                  <p className="games-section-copy games-casino-store-copy">
+                    Tune your claim rate with short-term multipliers, then carry those boosted chips
+                    straight into poker.
+                  </p>
+
+                  <div className="games-casino-store-footer">
+                    <span className="games-casino-store-status">{boostSummary}</span>
+                    <p className="games-casino-disclaimer">
+                      Current boosted claim:{" "}
+                      <span className="games-casino-chip-inline">
+                        <span className="games-casino-chip-badge" aria-hidden="true">
+                          <img src={CHIP_IMAGE_URL} alt="" />
+                        </span>
+                        {formatChips(freeChips.boostedDailyAmount)} chips
+                      </span>
+                      .
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <div className="games-casino-inline-stats">
-              <div className="games-casino-stat-card">
-                <p className="games-casino-stat-label">CEDRA Wallet</p>
-                <p className="games-casino-stat-value">
-                  {formatCedraFromOctas(BigInt(Math.max(cedraBalance, 0)))}
+            <div className="games-casino-column games-casino-column-secondary">
+              <div className="games-card games-card-body games-section games-casino-summary-card">
+                <div className="games-casino-summary-head">
+                  <div>
+                    <p className="games-section-kicker">Account Overview</p>
+                    <h2 className="games-section-title">Wallet Balances</h2>
+                  </div>
+                </div>
+
+                <div className="games-casino-inline-stats">
+                  <div className="games-casino-stat-card">
+                    <p className="games-casino-stat-label">CEDRA Wallet</p>
+                    <p className="games-casino-stat-value games-casino-stat-value-balance">
+                      <span>{cedraDisplay}</span>
+                      <span className="games-casino-stat-unit">CEDRA</span>
+                    </p>
+                  </div>
+                  <div className="games-casino-stat-card">
+                    <p className="games-casino-stat-label">Chip Wallet</p>
+                    <p className="games-casino-stat-value games-casino-stat-value-chip">
+                      <span className="games-casino-chip-badge" aria-hidden="true">
+                        <img src={CHIP_IMAGE_URL} alt="" />
+                      </span>
+                      <span>{formatChips(chipActions.chipBalance)}</span>
+                    </p>
+                  </div>
+                </div>
+
+                <p className="games-casino-disclaimer">
+                  Your Cedra balance funds multiplier purchases, and your chip wallet is ready for
+                  poker tables.
                 </p>
               </div>
-              <div className="games-casino-stat-card">
-                <p className="games-casino-stat-label">Chip Wallet</p>
-                <p className="games-casino-stat-value">{formatChips(chipActions.chipBalance)}</p>
+
+            <div className="games-card games-card-body games-section games-casino-games-card">
+              <div className="games-casino-section-head">
+                <div>
+                  <p className="games-section-kicker">Available Games</p>
+                  <h2 className="games-section-title">Live Tables</h2>
+                </div>
               </div>
-            </div>
 
-            <p className="games-casino-disclaimer">
-              {boostSummary}. Current boosted claim:{" "}
-              {formatChips(freeChips.boostedDailyAmount)} chips.
-            </p>
-          </div>
+                <div className="games-casino-live-tile">
+                  <div className="games-casino-live-head">
+                    <img
+                      className="games-casino-game-icon"
+                      src="/assets/casino/game-icon.png"
+                      alt="Poker"
+                    />
+                    <div className="games-casino-game-meta">
+                      <p className="games-casino-game-title">Texas Hold&apos;em</p>
+                      <p className="games-casino-game-copy">
+                        Join direct tables, browse active rooms, or host your own from a cleaner
+                        poker floor with a desktop-ready lobby.
+                      </p>
+                    </div>
+                  </div>
 
-          <div className="games-card games-card-body games-section">
-            <div>
-              <p className="games-section-kicker">Available Games</p>
-              <h2 className="games-section-title">Live Tables</h2>
-            </div>
+                  <div className="games-casino-live-points">
+                    <span>Live lobby access</span>
+                    <span>Owner-hosted tables</span>
+                    <span>Chip-funded play</span>
+                  </div>
 
-            <div className="games-casino-game-row">
-              <img
-                className="games-casino-game-icon"
-                src="/assets/casino/game-icon.png"
-                alt="Poker"
-              />
-              <div className="games-casino-game-meta">
-                <p className="games-casino-game-title">Texas Hold&apos;em</p>
-                <p className="games-casino-game-copy">
-                  Use your chip balance to join direct tables, browse active rooms, or host your
-                  own.
-                </p>
+                  <div className="games-casino-live-actions">
+                    <Link className="games-button-link games-button-link-primary" to="/games/poker">
+                      Enter Poker
+                    </Link>
+                  </div>
+                </div>
               </div>
-              <Link className="games-button-link games-button-link-primary" to="/games/poker">
-                Enter
-              </Link>
             </div>
           </div>
         </div>

@@ -43,8 +43,10 @@ import { deriveThemeFromColor } from "../utils/theme";
 import { ChatProvider, useChatContext } from "../context/chat";
 import { AbortVoteModal } from "../components/poker/AbortVoteModal";
 import { ChatPanel } from "../components/poker/ChatPanel";
+import { CommitRevealOverlay } from "../components/poker/CommitRevealOverlay";
 import { JoinTableModal } from "../components/poker/JoinTableModal";
 import { ShowdownModal } from "../components/poker/ShowdownModal";
+import { deriveGameplayTimerState } from "../utils/poker/timers";
 import "../styles/games.css";
 
 const NORMAL_POLL = 3000;
@@ -170,9 +172,9 @@ function PokerGameplayContent({ tableAddress }: PokerGameplayContentProps) {
   const [newBigBlind, setNewBigBlind] = useState("");
   const [newMinBuyIn, setNewMinBuyIn] = useState("");
   const [newMaxBuyIn, setNewMaxBuyIn] = useState("");
-  const [nowMs, setNowMs] = useState(0);
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const [failedAvatarUrls, setFailedAvatarUrls] = useState<Set<string>>(new Set());
-  const [routeReadyForErrors, setRouteReadyForErrors] = useState(false);
+  const routeReadyForErrorsRef = useRef(false);
   const [showdownData, setShowdownData] = useState<ShowdownState>({
     visible: false,
     winners: [],
@@ -257,15 +259,15 @@ function PokerGameplayContent({ tableAddress }: PokerGameplayContentProps) {
   });
 
   useEffect(() => {
-    setRouteReadyForErrors(false);
+    routeReadyForErrorsRef.current = false;
     clearError();
     if (!tableAddress || !contractsReady) return;
     setActiveTable(tableAddress, network);
     void refreshTableData(address || undefined);
-    setRouteReadyForErrors(true);
+    routeReadyForErrorsRef.current = true;
 
     return () => {
-      setRouteReadyForErrors(false);
+      routeReadyForErrorsRef.current = false;
       reset();
     };
   }, [address, clearError, contractsReady, network, refreshTableData, reset, setActiveTable, tableAddress]);
@@ -280,14 +282,10 @@ function PokerGameplayContent({ tableAddress }: PokerGameplayContentProps) {
   }, [isAdmin, setIsTableOwner]);
 
   useEffect(() => {
-    const initializeId = window.setTimeout(() => {
-      setNowMs(Date.now());
-    }, 0);
     const id = window.setInterval(() => {
       setNowMs(Date.now());
     }, 1000);
     return () => {
-      window.clearTimeout(initializeId);
       window.clearInterval(id);
     };
   }, []);
@@ -329,30 +327,25 @@ function PokerGameplayContent({ tableAddress }: PokerGameplayContentProps) {
   }, [isMyTurn, needsCommit, needsReveal, setUrgent]);
 
   useEffect(() => {
-    if (routeReadyForErrors && error === "TABLE_CLOSED") {
+    if (routeReadyForErrorsRef.current && error === "TABLE_CLOSED") {
       clearError();
       pushToast("info", "This table was closed.");
       navigate("/games/poker", { replace: true });
     }
-  }, [clearError, error, navigate, pushToast, routeReadyForErrors]);
+  }, [clearError, error, navigate, pushToast]);
 
   useEffect(() => {
     if (!actionLocked) return;
 
-    if (phase < GAME_PHASES.PREFLOP || phase > GAME_PHASES.RIVER) {
-      setActionLocked(false);
-      return;
-    }
-    if (!isMyTurn) {
-      setActionLocked(false);
-      return;
-    }
-    if (actionLockPhase !== null && phase !== actionLockPhase) {
-      setActionLocked(false);
-      return;
-    }
-    if (actionLockHand !== null && tableState?.handNumber && tableState.handNumber !== actionLockHand) {
-      setActionLocked(false);
+    const shouldUnlock =
+      phase < GAME_PHASES.PREFLOP ||
+      phase > GAME_PHASES.RIVER ||
+      !isMyTurn ||
+      (actionLockPhase !== null && phase !== actionLockPhase) ||
+      (actionLockHand !== null && tableState?.handNumber != null && tableState.handNumber !== actionLockHand);
+    if (shouldUnlock) {
+      const id = window.setTimeout(() => setActionLocked(false), 0);
+      return () => window.clearTimeout(id);
     }
   }, [actionLockHand, actionLockPhase, actionLocked, isMyTurn, phase, tableState?.handNumber]);
 
@@ -366,7 +359,10 @@ function PokerGameplayContent({ tableAddress }: PokerGameplayContentProps) {
     previousHandNumberRef.current = null;
     processedHandsRef.current = new Set();
     latestHandRef.current = 0;
-    setShowdownData((current) => ({ ...current, visible: false }));
+    const id = window.setTimeout(() => {
+      setShowdownData((current) => (current.visible ? { ...current, visible: false } : current));
+    }, 0);
+    return () => window.clearTimeout(id);
   }, [tableAddress]);
 
   useEffect(() => {
@@ -394,7 +390,11 @@ function PokerGameplayContent({ tableAddress }: PokerGameplayContentProps) {
       }
     } else {
       if (currentHand > prevHand) {
-        setShowdownData((current) => ({ ...current, visible: false }));
+        // Hide showdown when hand increments — scheduled via setTimeout to
+        // avoid synchronous setState inside an effect body.
+        window.setTimeout(() => {
+          setShowdownData((current) => (current.visible ? { ...current, visible: false } : current));
+        }, 0);
       }
 
       if (handIncremented) {
@@ -644,9 +644,9 @@ function PokerGameplayContent({ tableAddress }: PokerGameplayContentProps) {
 
   const canStartHand = Boolean(
     summary &&
-      !summary.isPaused &&
-      activeSeatCount >= 2 &&
-      (!summary.ownerOnlyStart || isAdmin)
+    !summary.isPaused &&
+    activeSeatCount >= 2 &&
+    (!summary.ownerOnlyStart || isAdmin)
   );
 
   const canStraddle = useMemo(() => {
@@ -684,15 +684,30 @@ function PokerGameplayContent({ tableAddress }: PokerGameplayContentProps) {
     return PHASE_NAMES[phase] || `Phase ${phase}`;
   }, [summary?.isPaused, needsCommit, needsReveal, phase, activeSeatCount, isMyTurn, actionInfo?.playerAddr]);
 
-  const timerSeconds = useMemo(() => {
-    if (needsCommit && commitDeadline > 0) {
-      return Math.max(0, Math.floor((commitDeadline * 1000 - nowMs) / 1000));
-    }
-    if (needsReveal && revealDeadline > 0) {
-      return Math.max(0, Math.floor((revealDeadline * 1000 - nowMs) / 1000));
-    }
-    return null;
-  }, [commitDeadline, needsCommit, needsReveal, nowMs, revealDeadline]);
+  const timerState = useMemo(
+    () =>
+      deriveGameplayTimerState({
+        nowMs,
+        needsCommit,
+        needsReveal,
+        commitDeadline,
+        revealDeadline,
+        actionDeadline: actionInfo?.deadline ?? null
+      }),
+    [actionInfo?.deadline, commitDeadline, needsCommit, needsReveal, nowMs, revealDeadline]
+  );
+
+  const overlayVisible = mySeatIndex !== null && (needsCommit || needsReveal);
+
+  useEffect(() => {
+    if (!overlayVisible) return;
+    const id = window.setTimeout(() => {
+      setShowChat(false);
+      setShowOwnerPanel(false);
+      setShowAbortPanel(false);
+    }, 0);
+    return () => window.clearTimeout(id);
+  }, [overlayVisible]);
 
   const pendingActionCopy = useMemo(() => {
     if (tableActions.pendingAction || bettingActions.pendingAction || ownerActions.pendingAction || abortVote.isPending) {
@@ -723,6 +738,21 @@ function PokerGameplayContent({ tableAddress }: PokerGameplayContentProps) {
 
   const buyInBbMin = summary?.bigBlind ? Math.floor(summary.minBuyIn / summary.bigBlind) : 0;
   const buyInBbMax = summary?.bigBlind ? Math.floor(summary.maxBuyIn / summary.bigBlind) : 0;
+
+  const handleCommitPrompt = useCallback(() => {
+    void runAction(async (activeSigner) => commitReveal.commit(activeSigner));
+  }, [commitReveal, runAction]);
+
+  const handleRevealPrompt = useCallback(() => {
+    void runAction(async (activeSigner) => commitReveal.reveal(activeSigner));
+  }, [commitReveal, runAction]);
+
+  const handleTimeoutAction = useCallback(() => {
+    void runAction(
+      (activeSigner) => timeoutHandler.callTimeout(activeSigner),
+      { lockOnSuccess: true }
+    );
+  }, [runAction, timeoutHandler]);
 
   if (!tableAddress) {
     return (
@@ -799,43 +829,29 @@ function PokerGameplayContent({ tableAddress }: PokerGameplayContentProps) {
         <div className={`games-wallet-status-bar ${isMyTurn ? "active" : ""}`}>
           <p className="m-0">• {statusMessage}</p>
           <div className="games-wallet-status-actions">
-            {needsCommit && (
-              <button
-                type="button"
-                className="games-wallet-mini-btn games-wallet-mini-btn-accent"
-                onClick={() =>
-                  void runAction(async (activeSigner) => commitReveal.commit(activeSigner))
-                }
-              >
-                Request
-              </button>
-            )}
-            {needsReveal && (
-              <button
-                type="button"
-                className="games-wallet-mini-btn games-wallet-mini-btn-accent"
-                onClick={() =>
-                  void runAction(async (activeSigner) => commitReveal.reveal(activeSigner))
-                }
-              >
-                Accept
-              </button>
-            )}
             <button
               type="button"
               className="games-wallet-mini-btn games-wallet-mini-btn-danger"
-              disabled={!timeoutHandler.canCallTimeout}
-              onClick={() =>
-                void runAction(
-                  (activeSigner) => timeoutHandler.callTimeout(activeSigner),
-                  { lockOnSuccess: true }
-                )
-              }
+              disabled={!timeoutHandler.canCallTimeout || timeoutHandler.isPending}
+              onClick={handleTimeoutAction}
             >
-              Timeout
+              {timeoutHandler.isPending ? "Timing out..." : "Timeout"}
             </button>
           </div>
         </div>
+
+        <CommitRevealOverlay
+          visible={overlayVisible}
+          phase={needsCommit ? "commit" : "reveal"}
+          secondsRemaining={timerState.secondsRemaining ?? 0}
+          status={commitReveal.status}
+          error={commitReveal.error}
+          canCallTimeout={timeoutHandler.canCallTimeout}
+          timeoutPending={timeoutHandler.isPending}
+          onCommit={handleCommitPrompt}
+          onReveal={handleRevealPrompt}
+          onTimeout={handleTimeoutAction}
+        />
 
         {!contractsReady && (
           <div className="games-wallet-config-warning">
@@ -901,9 +917,8 @@ function PokerGameplayContent({ tableAddress }: PokerGameplayContentProps) {
                 <button
                   key={actualSeatIndex}
                   type="button"
-                  className={`games-wallet-seat games-wallet-seat-${displayPosition} ${
-                    isActive ? "active" : ""
-                  } ${mySeatIndex === actualSeatIndex ? "hero" : ""} ${canJoinThisSeat ? "joinable" : ""}`}
+                  className={`games-wallet-seat games-wallet-seat-${displayPosition} ${isActive ? "active" : ""
+                    } ${mySeatIndex === actualSeatIndex ? "hero" : ""} ${canJoinThisSeat ? "joinable" : ""}`}
                   onClick={() => {
                     if (canJoinThisSeat) {
                       setJoinSeat(actualSeatIndex);
@@ -937,7 +952,9 @@ function PokerGameplayContent({ tableAddress }: PokerGameplayContentProps) {
                     <>
                       <span className={`games-wallet-seat-name ${isFolded ? "muted" : ""}`}>{seatName}</span>
                       <span className={`games-wallet-seat-stack ${isFolded ? "muted" : ""}`}>
-                        <img src={CHIP_IMAGE_URL} alt="" aria-hidden />
+                        <span className="games-chip-medallion games-chip-medallion-xs" aria-hidden="true">
+                          <img src={CHIP_IMAGE_URL} alt="" />
+                        </span>
                         {formatChips(seat.chipCount)}
                       </span>
                       {isAllIn && <span className="games-wallet-seat-allin">ALL-IN</span>}
@@ -946,7 +963,9 @@ function PokerGameplayContent({ tableAddress }: PokerGameplayContentProps) {
 
                   {shouldShowBet && (
                     <span className="games-wallet-seat-bet">
-                      <img src={CHIP_IMAGE_URL} alt="" aria-hidden />
+                      <span className="games-chip-medallion games-chip-medallion-xs" aria-hidden="true">
+                        <img src={CHIP_IMAGE_URL} alt="" />
+                      </span>
                       {formatChips(seat.currentBet)}
                     </span>
                   )}
@@ -957,264 +976,266 @@ function PokerGameplayContent({ tableAddress }: PokerGameplayContentProps) {
         </section>
 
         <div className="games-wallet-info-row">
-          <span className={`games-wallet-timer ${timerSeconds !== null && timerSeconds <= 10 ? "urgent" : ""}`}>
-            {formatTimer(timerSeconds)}
+          <span className={`games-wallet-timer ${timerState.isUrgent ? "urgent" : ""}`}>
+            {formatTimer(timerState.secondsRemaining)}
           </span>
           <span>{PHASE_NAMES[phase] || "Waiting"}</span>
           <span>Hand #{tableState?.handNumber || 0}</span>
         </div>
 
-        {phase === GAME_PHASES.WAITING && mySeatIndex !== null && (
-          <div className="games-wallet-waiting-controls">
-            <button
-              type="button"
-              className="games-wallet-start-btn"
-              disabled={!canStartHand}
-              onClick={() => void runAction((activeSigner) => tableActions.doStartHand(activeSigner))}
-            >
-              Start Hand
-            </button>
-            <button
-              type="button"
-              className="games-wallet-leave-btn"
-              onClick={() => void runAction((activeSigner) => tableActions.doLeave(activeSigner))}
-            >
-              Leave
-            </button>
-          </div>
-        )}
+        <div className="games-wallet-right-panel">
+          {phase === GAME_PHASES.WAITING && mySeatIndex !== null && (
+            <div className="games-wallet-waiting-controls">
+              <button
+                type="button"
+                className="games-wallet-start-btn"
+                disabled={!canStartHand}
+                onClick={() => void runAction((activeSigner) => tableActions.doStartHand(activeSigner))}
+              >
+                Start Hand
+              </button>
+              <button
+                type="button"
+                className="games-wallet-leave-btn"
+                onClick={() => void runAction((activeSigner) => tableActions.doLeave(activeSigner))}
+              >
+                Leave
+              </button>
+            </div>
+          )}
 
-        {mySeatIndex === null && (
-          <div className="games-wallet-waiting-controls">
-            <button
-              type="button"
-              className="games-wallet-start-btn"
-              disabled={chipActions.chipBalance <= 0 || !summary || summary.occupiedSeats >= summary.totalSeats}
-              onClick={() => setShowJoinModal(true)}
-            >
-              {chipActions.chipBalance <= 0 ? "No Chips" : "Join Table"}
-            </button>
-            <Link className="games-wallet-leave-btn" to="/games/poker">
-              Back
-            </Link>
-          </div>
-        )}
+          {mySeatIndex === null && (
+            <div className="games-wallet-waiting-controls">
+              <button
+                type="button"
+                className="games-wallet-start-btn"
+                disabled={chipActions.chipBalance <= 0 || !summary || summary.occupiedSeats >= summary.totalSeats}
+                onClick={() => setShowJoinModal(true)}
+              >
+                {chipActions.chipBalance <= 0 ? "No Chips" : "Join Table"}
+              </button>
+              <Link className="games-wallet-leave-btn" to="/games/poker">
+                Back
+              </Link>
+            </div>
+          )}
 
-        {mySeatIndex !== null && (
-          <section className="games-wallet-hero-bar">
-            <div className="games-wallet-hero-top">
-              <div className="games-wallet-hero-summary">
-                <span className={`games-wallet-hero-avatar ${isMyTurn ? "active" : ""}`}>
-                  {myProfile?.avatarUrl && !myAvatarBlocked ? (
-                    <img
-                      src={myProfile.avatarUrl}
-                      alt={myProfile.nickname || "Hero"}
-                      onError={() => {
-                        setFailedAvatarUrls((current) => {
-                          const next = new Set(current);
-                          next.add(myProfile.avatarUrl as string);
-                          return next;
-                        });
-                      }}
-                    />
-                  ) : (
-                    <span>{(myProfile?.nickname || "H").slice(0, 1).toUpperCase()}</span>
-                  )}
-                </span>
-                <div>
-                  <p className="m-0 games-wallet-hero-label">MY STACK</p>
-                  <p className="m-0 games-wallet-hero-value">{formatChips(myStack)}</p>
+          {mySeatIndex !== null && (
+            <section className="games-wallet-hero-bar">
+              <div className="games-wallet-hero-top">
+                <div className="games-wallet-hero-summary">
+                  <span className={`games-wallet-hero-avatar ${isMyTurn ? "active" : ""}`}>
+                    {myProfile?.avatarUrl && !myAvatarBlocked ? (
+                      <img
+                        src={myProfile.avatarUrl}
+                        alt={myProfile.nickname || "Hero"}
+                        onError={() => {
+                          setFailedAvatarUrls((current) => {
+                            const next = new Set(current);
+                            next.add(myProfile.avatarUrl as string);
+                            return next;
+                          });
+                        }}
+                      />
+                    ) : (
+                      <span>{(myProfile?.nickname || "H").slice(0, 1).toUpperCase()}</span>
+                    )}
+                  </span>
+                  <div>
+                    <p className="m-0 games-wallet-hero-label">MY STACK</p>
+                    <p className="m-0 games-wallet-hero-value">{formatChips(myStack)}</p>
+                  </div>
+                </div>
+
+                <div className="games-wallet-hero-cards">
+                  {[0, 1].map((idx) => {
+                    const card = myHoleCards[idx];
+                    const hidden = card === undefined || !myCardsDecrypted;
+                    return (
+                      <span key={idx} className={`games-wallet-card small ${hidden ? "face-down" : ""}`}>
+                        {hidden ? "♠" : formatCard(card)}
+                      </span>
+                    );
+                  })}
+                </div>
+
+                <div className="games-wallet-raise-box">
+                  <label htmlFor="raise-input">RAISE TO</label>
+                  <input
+                    id="raise-input"
+                    className="games-wallet-text-input"
+                    value={raiseToAmount}
+                    onChange={(event) => {
+                      setRaiseToAmount(event.target.value);
+                      const parsed = Number.parseInt(event.target.value, 10);
+                      if (Number.isFinite(parsed)) {
+                        syncRatioFromRaise(parsed);
+                      }
+                    }}
+                    placeholder={`${minRaiseTo}`}
+                  />
                 </div>
               </div>
 
-              <div className="games-wallet-hero-cards">
-                {[0, 1].map((idx) => {
-                  const card = myHoleCards[idx];
-                  const hidden = card === undefined || !myCardsDecrypted;
-                  return (
-                    <span key={idx} className={`games-wallet-card small ${hidden ? "face-down" : ""}`}>
-                      {hidden ? "♠" : formatCard(card)}
-                    </span>
-                  );
-                })}
-              </div>
-
-              <div className="games-wallet-raise-box">
-                <label htmlFor="raise-input">RAISE TO</label>
+              <div className="games-wallet-raise-controls">
+                <div className="games-wallet-preset-row">
+                  <button
+                    type="button"
+                    className="games-wallet-preset-btn"
+                    onClick={() => setRaisePreset(0)}
+                    disabled={!inBettingRound || !isMyTurn || actionLocked}
+                  >
+                    MIN
+                  </button>
+                  <button
+                    type="button"
+                    className="games-wallet-preset-btn"
+                    onClick={() => setRaisePreset(50)}
+                    disabled={!inBettingRound || !isMyTurn || actionLocked}
+                  >
+                    50%
+                  </button>
+                  <button
+                    type="button"
+                    className="games-wallet-preset-btn"
+                    onClick={() => setRaisePreset(100)}
+                    disabled={!inBettingRound || !isMyTurn || actionLocked}
+                  >
+                    MAX
+                  </button>
+                </div>
                 <input
-                  id="raise-input"
-                  className="games-wallet-text-input"
-                  value={raiseToAmount}
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={raiseRatio}
+                  className="games-wallet-raise-slider"
+                  disabled={!inBettingRound || !isMyTurn || maxRaiseTo <= minRaiseTo || actionLocked}
                   onChange={(event) => {
-                    setRaiseToAmount(event.target.value);
-                    const parsed = Number.parseInt(event.target.value, 10);
-                    if (Number.isFinite(parsed)) {
-                      syncRatioFromRaise(parsed);
-                    }
+                    const ratio = Number.parseInt(event.target.value, 10);
+                    setRaiseRatio(ratio);
+                    setRaiseToAmount(String(calculateRaiseFromRatio(ratio)));
                   }}
-                  placeholder={`${minRaiseTo}`}
                 />
               </div>
-            </div>
 
-            <div className="games-wallet-raise-controls">
-              <div className="games-wallet-preset-row">
+              <div className="games-wallet-action-row">
                 <button
                   type="button"
-                  className="games-wallet-preset-btn"
-                  onClick={() => setRaisePreset(0)}
-                  disabled={!inBettingRound || !isMyTurn || actionLocked}
+                  className="games-wallet-action-btn fold"
+                  disabled={!isMyTurn || !inBettingRound || actionLocked}
+                  onClick={() =>
+                    void runAction(
+                      (activeSigner) => bettingActions.doFold(activeSigner),
+                      { lockOnSuccess: true }
+                    )
+                  }
                 >
-                  MIN
+                  Fold
                 </button>
                 <button
                   type="button"
-                  className="games-wallet-preset-btn"
-                  onClick={() => setRaisePreset(50)}
-                  disabled={!inBettingRound || !isMyTurn || actionLocked}
+                  className="games-wallet-action-btn check"
+                  disabled={!isMyTurn || !inBettingRound || !canCheck || actionLocked}
+                  onClick={() =>
+                    void runAction(
+                      (activeSigner) => bettingActions.doCheck(activeSigner),
+                      { lockOnSuccess: true }
+                    )
+                  }
                 >
-                  50%
+                  Check
                 </button>
                 <button
                   type="button"
-                  className="games-wallet-preset-btn"
-                  onClick={() => setRaisePreset(100)}
-                  disabled={!inBettingRound || !isMyTurn || actionLocked}
+                  className="games-wallet-action-btn call"
+                  disabled={!isMyTurn || !inBettingRound || canCheck || actionLocked}
+                  onClick={() =>
+                    void runAction(
+                      (activeSigner) => bettingActions.doCall(activeSigner),
+                      { lockOnSuccess: true }
+                    )
+                  }
                 >
-                  MAX
+                  Call {formatChips(callAmount)}
+                </button>
+                <button
+                  type="button"
+                  className="games-wallet-action-btn raise"
+                  disabled={!isMyTurn || !inBettingRound || actionLocked}
+                  onClick={() => {
+                    const parsed = Number.parseInt(raiseToAmount, 10);
+                    if (!Number.isFinite(parsed) || parsed <= 0) {
+                      pushToast("error", "Enter a valid raise amount.");
+                      return;
+                    }
+                    if (parsed < minRaiseTo) {
+                      pushToast("error", `Raise must be at least ${formatChips(minRaiseTo)}.`);
+                      return;
+                    }
+                    void runAction(
+                      (activeSigner) => bettingActions.doRaise(activeSigner, BigInt(parsed)),
+                      { lockOnSuccess: true }
+                    );
+                  }}
+                >
+                  Raise
                 </button>
               </div>
-              <input
-                type="range"
-                min={0}
-                max={100}
-                value={raiseRatio}
-                className="games-wallet-raise-slider"
-                disabled={!inBettingRound || !isMyTurn || maxRaiseTo <= minRaiseTo || actionLocked}
-                onChange={(event) => {
-                  const ratio = Number.parseInt(event.target.value, 10);
-                  setRaiseRatio(ratio);
-                  setRaiseToAmount(String(calculateRaiseFromRatio(ratio)));
-                }}
-              />
-            </div>
 
-            <div className="games-wallet-action-row">
-              <button
-                type="button"
-                className="games-wallet-action-btn fold"
-                disabled={!isMyTurn || !inBettingRound || actionLocked}
-                onClick={() =>
-                  void runAction(
-                    (activeSigner) => bettingActions.doFold(activeSigner),
-                    { lockOnSuccess: true }
-                  )
-                }
-              >
-                Fold
-              </button>
-              <button
-                type="button"
-                className="games-wallet-action-btn check"
-                disabled={!isMyTurn || !inBettingRound || !canCheck || actionLocked}
-                onClick={() =>
-                  void runAction(
-                    (activeSigner) => bettingActions.doCheck(activeSigner),
-                    { lockOnSuccess: true }
-                  )
-                }
-              >
-                Check
-              </button>
-              <button
-                type="button"
-                className="games-wallet-action-btn call"
-                disabled={!isMyTurn || !inBettingRound || canCheck || actionLocked}
-                onClick={() =>
-                  void runAction(
-                    (activeSigner) => bettingActions.doCall(activeSigner),
-                    { lockOnSuccess: true }
-                  )
-                }
-              >
-                Call {formatChips(callAmount)}
-              </button>
-              <button
-                type="button"
-                className="games-wallet-action-btn raise"
-                disabled={!isMyTurn || !inBettingRound || actionLocked}
-                onClick={() => {
-                  const parsed = Number.parseInt(raiseToAmount, 10);
-                  if (!Number.isFinite(parsed) || parsed <= 0) {
-                    pushToast("error", "Enter a valid raise amount.");
-                    return;
+              <div className="games-wallet-subaction-row">
+                <button
+                  type="button"
+                  className="games-wallet-link-btn danger"
+                  disabled={!isMyTurn || !inBettingRound || actionLocked}
+                  onClick={() =>
+                    void runAction(
+                      (activeSigner) => bettingActions.doAllIn(activeSigner),
+                      { lockOnSuccess: true }
+                    )
                   }
-                  if (parsed < minRaiseTo) {
-                    pushToast("error", `Raise must be at least ${formatChips(minRaiseTo)}.`);
-                    return;
+                >
+                  ALL-IN ({formatChips(myStack)})
+                </button>
+                <button
+                  type="button"
+                  className="games-wallet-link-btn"
+                  disabled={!canStraddle || actionLocked}
+                  onClick={() =>
+                    void runAction(
+                      (activeSigner) => bettingActions.doStraddle(activeSigner),
+                      { lockOnSuccess: true }
+                    )
                   }
-                  void runAction(
-                    (activeSigner) => bettingActions.doRaise(activeSigner, BigInt(parsed)),
-                    { lockOnSuccess: true }
-                  );
-                }}
-              >
-                Raise
-              </button>
-            </div>
-
-            <div className="games-wallet-subaction-row">
-              <button
-                type="button"
-                className="games-wallet-link-btn danger"
-                disabled={!isMyTurn || !inBettingRound || actionLocked}
-                onClick={() =>
-                  void runAction(
-                    (activeSigner) => bettingActions.doAllIn(activeSigner),
-                    { lockOnSuccess: true }
-                  )
-                }
-              >
-                ALL-IN ({formatChips(myStack)})
-              </button>
-              <button
-                type="button"
-                className="games-wallet-link-btn"
-                disabled={!canStraddle || actionLocked}
-                onClick={() =>
-                  void runAction(
-                    (activeSigner) => bettingActions.doStraddle(activeSigner),
-                    { lockOnSuccess: true }
-                  )
-                }
-              >
-                Straddle
-              </button>
-              <button
-                type="button"
-                className="games-wallet-link-btn"
-                onClick={() => void runAction((activeSigner) => tableActions.doSitOut(activeSigner))}
-              >
-                Sit Out
-              </button>
-              <button
-                type="button"
-                className="games-wallet-link-btn"
-                onClick={() => void runAction((activeSigner) => tableActions.doSitIn(activeSigner))}
-              >
-                Sit In
-              </button>
-              <button
-                type="button"
-                className="games-wallet-link-btn"
-                onClick={() => setShowAbortPanel(true)}
-              >
-                Abort
-              </button>
-              <span className="games-wallet-pending-copy">{pendingActionCopy}</span>
-            </div>
-          </section>
-        )}
+                >
+                  Straddle
+                </button>
+                <button
+                  type="button"
+                  className="games-wallet-link-btn"
+                  onClick={() => void runAction((activeSigner) => tableActions.doSitOut(activeSigner))}
+                >
+                  Sit Out
+                </button>
+                <button
+                  type="button"
+                  className="games-wallet-link-btn"
+                  onClick={() => void runAction((activeSigner) => tableActions.doSitIn(activeSigner))}
+                >
+                  Sit In
+                </button>
+                <button
+                  type="button"
+                  className="games-wallet-link-btn"
+                  onClick={() => setShowAbortPanel(true)}
+                >
+                  Abort
+                </button>
+                <span className="games-wallet-pending-copy">{pendingActionCopy}</span>
+              </div>
+            </section>
+          )}
+        </div>
       </div>
 
       {showOwnerPanel && isAdmin && summary && (

@@ -12,7 +12,6 @@ import {
   PokerGameplayPage,
   PokerLandingPage,
   PokerTablesPage,
-  ProfilePage,
   SkillGamesPage,
   ThirdPartyGamesPage
 } from "@/features/games/pages";
@@ -25,7 +24,6 @@ export const router = createBrowserRouter(
       element: <GamesMobileLayout />,
       children: [
         { index: true, element: <GamesHubPage /> },
-        { path: "profile", element: <ProfilePage /> },
         { path: "skill-games", element: <SkillGamesPage /> },
         { path: "third-party", element: <ThirdPartyGamesPage /> },
         { path: "casino", element: <CasinoPage /> },

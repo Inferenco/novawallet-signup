@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("connect wallet and submit event flow", async ({ page }) => {
+test("connect wallet and submit event flow", async ({ page, isMobile }) => {
   await page.goto("/");
   await page.evaluate(() => {
     localStorage.removeItem("nova_mock_network_mismatch");
@@ -8,6 +8,9 @@ test("connect wallet and submit event flow", async ({ page }) => {
   await page.reload();
   await expect(page.getByRole("heading", { name: "Events" })).toBeVisible();
 
+  if (isMobile) {
+    await page.getByRole("button", { name: "Toggle menu" }).click();
+  }
   await page.goto("/events");
   await page.getByRole("button", { name: "Connect" }).click();
   await page.getByRole("button", { name: "Mock Zedra" }).click();
@@ -26,6 +29,9 @@ test("connect wallet and submit event flow", async ({ page }) => {
 
   await expect(page.getByText("Event request submitted.")).toBeVisible();
 
+  if (isMobile) {
+    await page.getByRole("button", { name: "Toggle menu" }).click();
+  }
   await page.getByRole("link", { name: "My Events" }).click();
   await expect(page.getByRole("heading", { name: "Pending Submissions" })).toBeVisible();
   await expect(page.getByText("E2E Event")).toBeVisible();
@@ -38,12 +44,15 @@ test("connect wallet and submit event flow", async ({ page }) => {
   await expect(page.getByText("Pending event cancelled.")).toBeVisible();
 });
 
-test("network mismatch blocks write actions", async ({ page }) => {
+test("network mismatch blocks write actions", async ({ page, isMobile }) => {
   await page.goto("/");
   await page.evaluate(() => {
     localStorage.setItem("nova_mock_network_mismatch", "1");
   });
 
+  if (isMobile) {
+    await page.getByRole("button", { name: "Toggle menu" }).click();
+  }
   await page.goto("/events");
   await page.getByRole("button", { name: "Connect" }).click();
   await page.getByRole("button", { name: "Mock Zedra" }).click();
@@ -60,17 +69,17 @@ test("network mismatch blocks write actions", async ({ page }) => {
 
 test("games routes and privacy pages render", async ({ page }) => {
   await page.goto("/games");
-  await expect(page.getByRole("heading", { name: "Nova Games" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Nova Gaming" })).toBeVisible();
   await expect(page.getByRole("link", { name: /Nova Casino/i })).toBeVisible();
 
   await page.goto("/games/casino");
-  await expect(page.getByRole("heading", { name: "Chips & Boosts" })).toBeVisible();
+  await expect(page.getByText("Connect your wallet to claim chips")).toBeVisible();
 
   await page.goto("/games/poker");
   await expect(page.getByRole("heading", { name: "Poker Lobby" })).toBeVisible();
 
   await page.goto("/games/poker/tables");
-  await expect(page.getByRole("heading", { name: "Poker Tables" })).toBeVisible();
+  await expect(page.getByText("Poker Tables", { exact: true })).toBeVisible();
 
   await page.goto("/games/poker/create");
   await expect(page.getByRole("heading", { name: "Create Poker Table" })).toBeVisible();

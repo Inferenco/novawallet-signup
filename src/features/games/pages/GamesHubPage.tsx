@@ -15,6 +15,10 @@ export function GamesHubPage() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [avatarFailed, setAvatarFailed] = useState(false);
+  const displayName = profile?.nickname?.trim() ? profile.nickname.trim() : "Anon User";
+  const displayAvatarUrl = profile?.avatarUrl?.trim() && !avatarFailed
+    ? profile.avatarUrl.trim()
+    : "/assets/casino/avatar-placeholder.svg";
 
   useEffect(() => {
     let alive = true;
@@ -54,22 +58,28 @@ export function GamesHubPage() {
   const navCards = useMemo(
     () => [
       {
+        kicker: "Casino Floor",
         title: "Nova Casino",
         description: "A free to play daily social casino",
         to: "/games/casino",
-        image: "/assets/casino/nova-casino-wide.jpg"
+        image: "/assets/casino/nova-casino-wide.jpg",
+        featured: false
       },
       {
+        kicker: "Competitive Play",
         title: "Games of Skill",
         description: "Strategy & skill-based games",
         to: "/games/skill-games",
-        image: "/assets/casino/games-of-skill-wide.jpg"
+        image: "/assets/casino/games-of-skill-wide.jpg",
+        featured: false
       },
       {
+        kicker: "Partner Studios",
         title: "3rd Party Games",
         description: "Partner games & integrations",
         to: "/games/third-party",
-        image: "/assets/casino/third-party-wide.jpg"
+        image: "/assets/casino/third-party-wide.jpg",
+        featured: false
       }
     ],
     []
@@ -77,7 +87,7 @@ export function GamesHubPage() {
 
   return (
     <section className="games-screen">
-      <GamesTopBar title="Gaming" rightSlot={<WalletButton />} />
+      <GamesTopBar title="Gaming" backTo="/" rightSlot={<WalletButton />} />
 
       {isLoading ? (
         <div className="games-loading-screen">
@@ -85,92 +95,74 @@ export function GamesHubPage() {
         </div>
       ) : (
         <div className="games-screen-scroll">
-          <div className="games-screen-content">
+          <div className="games-screen-content games-hub-layout">
             {!wallet.connected ? (
               <div className="games-card games-profile-setup">
                 <div className="games-profile-setup-icon">◎</div>
                 <div className="games-section">
-                  <h2 className="games-section-title">Connect Your Wallet</h2>
+                  <h2 className="games-section-title">Nova Gaming</h2>
                   <p className="games-section-copy">
-                    Connect a Cedra wallet to load your gaming profile and open casino or poker
-                    screens.
+                    Use the wallet control in the top-right corner to connect and open casino or
+                    poker screens.
                   </p>
                 </div>
-                <div className="games-inline-row" style={{ justifyContent: "center" }}>
-                  <WalletButton />
-                </div>
               </div>
-            ) : profile?.nickname ? (
+            ) : (
               <>
                 <section className="games-section">
                   <h2 className="games-section-title">Player Profile</h2>
                   <div className="games-card games-hub-profile-card">
-                    <Link className="games-hub-edit-link" to="/games/profile" aria-label="Edit profile">
-                      ✎
-                    </Link>
                     <div className="games-hub-profile-main">
                       <div className="games-hub-avatar-shell">
-                        {profile.avatarUrl && !avatarFailed ? (
-                          <img
-                            src={profile.avatarUrl}
-                            alt={profile.nickname}
-                            onError={() => setAvatarFailed(true)}
-                          />
-                        ) : (
-                          <span className="games-hub-avatar-fallback">
-                            {profile.nickname.slice(0, 1).toUpperCase()}
-                          </span>
-                        )}
+                        <img
+                          src={displayAvatarUrl}
+                          alt={displayName}
+                          onError={() => setAvatarFailed(true)}
+                        />
                       </div>
                       <div className="games-hub-profile-meta">
-                        <p className="games-hub-profile-name">{profile.nickname}</p>
+                        <p className="games-hub-profile-name">{displayName}</p>
                         <span className="games-hub-address-badge">◇ {shortAddress(address ?? "")}</span>
                       </div>
                     </div>
                   </div>
                 </section>
-
-                <section className="games-section">
-                  <h2 className="games-section-title">Games</h2>
-                  <div className="games-hub-nav-grid">
-                    {navCards.map((card) => (
-                      <Link
-                        key={card.to}
-                        className="games-hub-nav-card"
-                        to={card.to}
-                        style={{ backgroundImage: `url(${card.image})` }}
-                      >
-                        <div>
-                          <p className="games-hub-nav-title">{card.title}</p>
-                          <p className="games-hub-nav-copy">{card.description}</p>
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                </section>
               </>
-            ) : (
-              <div className="games-card games-profile-setup">
-                <div className="games-profile-setup-icon">◌</div>
-                <div className="games-section">
-                  <h2 className="games-section-title">Set Up Your Player Profile</h2>
-                  <p className="games-section-copy">
-                    Create a player name to start playing games. Your profile will be visible to
-                    other players.
-                  </p>
-                </div>
-                <div className="games-profile-setup-warning">
-                  <p className="games-profile-setup-warning-title">Gas Required</p>
-                  <p className="games-section-copy">
-                    You need CEDRA in this wallet to create a player profile. This is an on-chain
-                    transaction.
-                  </p>
-                </div>
-                <Link className="games-button-link games-button-link-primary" to="/games/profile">
-                  Set Up Profile
-                </Link>
-              </div>
             )}
+
+            <section className="games-section">
+              <div className="games-inline-row games-hub-section-header">
+                <div>
+                  <p className="games-section-kicker">Game Rooms</p>
+                  <h2 className="games-section-title">Games</h2>
+                </div>
+                <p className="games-status-text">Choose a room and enter instantly</p>
+              </div>
+              <div className="games-hub-nav-grid">
+                {navCards.map((card) => (
+                  <Link
+                    key={card.to}
+                    className={`games-hub-nav-card ${card.featured ? "featured" : ""}`}
+                    to={card.to}
+                  >
+                    <div
+                      className="games-hub-nav-image"
+                      style={{ backgroundImage: `url(${card.image})` }}
+                      aria-hidden="true"
+                    />
+                    <div className="games-hub-nav-scrim" aria-hidden="true" />
+                    <div className="games-hub-nav-glow" aria-hidden="true" />
+                    <div className="games-hub-nav-body">
+                      <div className="games-hub-nav-content">
+                        <p className="games-hub-nav-kicker">{card.kicker}</p>
+                        <p className="games-hub-nav-title">{card.title}</p>
+                        <p className="games-hub-nav-copy">{card.description}</p>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </section>
           </div>
         </div>
       )}
