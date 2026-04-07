@@ -52,7 +52,7 @@ export function ShowdownModal({
   if (!visible) return null;
 
   return (
-    <div className="games-overlay" role="dialog" aria-modal="true">
+    <div className="games-overlay games-showdown-overlay" role="dialog" aria-modal="true">
       <div className="games-modal-panel games-showdown-panel">
         <div className="games-modal-header">
           <div>

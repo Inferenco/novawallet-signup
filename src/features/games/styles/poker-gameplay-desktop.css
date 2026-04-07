@@ -1,0 +1,101 @@
+.poker-gameplay-shell-desktop {
+  min-height: 100dvh;
+  padding: 22px;
+  display: grid;
+  place-items: center;
+}
+
+.poker-gameplay-desktop-stage {
+  width: min(100%, 1160px);
+  display: grid;
+  gap: 14px;
+}
+
+.poker-gameplay-stage-desktop .poker-gameplay-stage-surface {
+  min-height: 620px;
+}
+
+.poker-gameplay-stage-desktop .poker-gameplay-table-oval {
+  inset: 68px 124px 116px;
+}
+
+.poker-gameplay-stage-desktop .poker-gameplay-seat-top-left {
+  top: 28px;
+  left: 24%;
+}
+
+.poker-gameplay-stage-desktop .poker-gameplay-seat-top-right {
+  top: 28px;
+  right: 24%;
+}
+
+.poker-gameplay-stage-desktop .poker-gameplay-seat-left {
+  top: 46%;
+  left: 28px;
+  transform: translateY(-50%);
+}
+
+.poker-gameplay-stage-desktop .poker-gameplay-seat-right {
+  top: 46%;
+  right: 28px;
+  transform: translateY(-50%);
+}
+
+.poker-gameplay-stage-desktop .poker-gameplay-seat-bottom {
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.poker-gameplay-stage-desktop .poker-gameplay-seat-left .poker-gameplay-seat-bet,
+.poker-gameplay-stage-desktop .poker-gameplay-seat-right .poker-gameplay-seat-bet {
+  top: 12px;
+}
+
+.poker-gameplay-stage-desktop .poker-gameplay-seat-top-left .poker-gameplay-seat-bet,
+.poker-gameplay-stage-desktop .poker-gameplay-seat-top-right .poker-gameplay-seat-bet {
+  bottom: -16px;
+}
+
+.poker-gameplay-stage-desktop .poker-gameplay-seat-bottom .poker-gameplay-seat-bet {
+  top: -16px;
+}
+
+.poker-gameplay-desktop-controls {
+  display: grid;
+  gap: 12px;
+}
+
+.poker-gameplay-desktop-waiting-row,
+.poker-gameplay-desktop-idle-row {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.poker-gameplay-dock-desktop {
+  padding: 18px 20px 18px;
+  border-radius: 26px;
+}
+
+.poker-gameplay-dock-desktop .poker-gameplay-dock-primary-row {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.poker-gameplay-dock-desktop .poker-gameplay-dock-raise-row.desktop {
+  min-width: 220px;
+}
+
+@media (max-width: 1199px) {
+  .poker-gameplay-shell-desktop {
+    padding: 16px;
+  }
+
+  .poker-gameplay-stage-desktop .poker-gameplay-stage-surface {
+    min-height: 560px;
+  }
+
+  .poker-gameplay-stage-desktop .poker-gameplay-table-oval {
+    inset: 60px 82px 108px;
+  }
+}
