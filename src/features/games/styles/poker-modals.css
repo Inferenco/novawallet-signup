@@ -106,10 +106,16 @@
 
 .games-chat-overlay {
   align-items: flex-end;
+  z-index: 54;
+  padding: 12px;
 }
 
 .games-chat-panel {
-  width: min(100%, 400px);
+  width: min(100%, 460px);
+  max-height: min(58vh, 560px);
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  padding-bottom: calc(18px + env(safe-area-inset-bottom));
 }
 
 .games-overlay-commit {
@@ -250,10 +256,64 @@
 }
 
 .games-chat-messages {
-  max-height: 32vh;
+  max-height: 28vh;
   overflow: auto;
   display: grid;
   gap: 10px;
+}
+
+.games-showdown-panel {
+  width: min(100%, 520px);
+}
+
+.games-showdown-summary {
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(244, 213, 141, 0.18);
+  background: rgba(244, 213, 141, 0.08);
+}
+
+.games-showdown-summary strong {
+  display: block;
+  font-size: 1.25rem;
+  color: #f6d58d;
+}
+
+.games-showdown-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.games-showdown-card {
+  min-width: 44px;
+  min-height: 60px;
+  padding: 0 8px;
+  border-radius: 12px;
+  border: 1px solid rgba(120, 163, 204, 0.28);
+  background: linear-gradient(180deg, #fbfdff, #f0f4fb);
+  color: #09121c;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.18);
+}
+
+.games-showdown-card.small {
+  min-width: 38px;
+  min-height: 54px;
+}
+
+@media (max-width: 639px) {
+  .games-chat-panel {
+    width: 100%;
+  }
 }
 
 .games-chat-message {

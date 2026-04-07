@@ -53,12 +53,14 @@ export function ShowdownModal({
 
   return (
     <div className="games-overlay" role="dialog" aria-modal="true">
-      <div className="games-modal-panel">
+      <div className="games-modal-panel games-showdown-panel">
         <div className="games-modal-header">
           <div>
-            <h3 className="games-modal-title">Hand #{handNumber}</h3>
+            <h3 className="games-modal-title">
+              {resultType === "fold_win" ? "Winner" : "Showdown"}
+            </h3>
             <p className="games-status-text">
-              {resultType === "fold_win" ? "Won by fold" : "Showdown complete"} • Pot{" "}
+              Hand #{handNumber} • {resultType === "fold_win" ? "Won by fold" : "Showdown complete"} • Pot{" "}
               {formatChips(totalPot)}
             </p>
           </div>
@@ -67,13 +69,25 @@ export function ShowdownModal({
           </button>
         </div>
 
-        <div className="games-board-row">
-          {communityCards.map((card, index) => (
-            <span key={`${card}-${index}`} className="games-showdown-card">
-              {formatCard(card)}
-            </span>
-          ))}
+        <div className="games-showdown-summary">
+          <span className="games-field-label">
+            {resultType === "fold_win" ? "Final Pot Awarded" : "Final Pot"}
+          </span>
+          <strong>{formatChips(totalPot)}</strong>
         </div>
+
+        {resultType !== "fold_win" && communityCards.length > 0 ? (
+          <div className="games-section">
+            <p className="games-field-label">Board</p>
+            <div className="games-board-row">
+              {communityCards.map((card, index) => (
+                <span key={`${card}-${index}`} className="games-showdown-card">
+                  {formatCard(card)}
+                </span>
+              ))}
+            </div>
+          </div>
+        ) : null}
 
         <div className="games-section">
           <p className="games-field-label">Winners</p>
@@ -85,7 +99,9 @@ export function ShowdownModal({
                 </p>
                 <p className="games-section-copy">
                   Seat {winner.seatIndex + 1}
-                  {winner.handType >= 0 ? ` • ${HAND_RANKS[winner.handType] || "Winning hand"}` : ""}
+                  {resultType !== "fold_win" && winner.handType >= 0
+                    ? ` • ${HAND_RANKS[winner.handType] || "Winning hand"}`
+                    : ""}
                 </p>
               </div>
               <strong>{formatChips(winner.amount)}</strong>
@@ -117,6 +133,10 @@ export function ShowdownModal({
             ))}
           </div>
         ) : null}
+
+        <button type="button" className="games-button games-button-primary" onClick={onClose}>
+          Continue
+        </button>
       </div>
     </div>
   );
