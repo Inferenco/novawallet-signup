@@ -1,7 +1,7 @@
 import { CHIP_IMAGE_URL, GAME_PHASES, PLAYER_STATUS } from "../../config/games";
 import { formatChips } from "../../services/poker/chips";
-import { formatCard } from "../../utils/poker/cards";
 import type { PokerGameplayViewModel } from "./pokerGameplayTypes";
+import { PokerPlayingCard } from "./PokerPlayingCard";
 
 interface PokerTableStageMobileProps {
   viewModel: PokerGameplayViewModel;
@@ -49,12 +49,12 @@ export function PokerTableStageMobile({
                 {[0, 1, 2, 3, 4].map((idx) => {
                   const card = viewModel.table.communityCards[idx];
                   return (
-                    <span
+                    <PokerPlayingCard
                       key={idx}
-                      className={`poker-gameplay-card ${card === undefined ? "face-down" : ""}`}
-                    >
-                      {card === undefined ? "♠" : formatCard(card)}
-                    </span>
+                      value={card}
+                      faceDown={card === undefined}
+                      size="board"
+                    />
                   );
                 })}
               </div>

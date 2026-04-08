@@ -1,7 +1,7 @@
 import { CHIP_IMAGE_URL } from "../../config/games";
 import { formatChips } from "../../services/poker/chips";
-import { formatCard } from "../../utils/poker/cards";
 import type { PokerGameplayActionHandlers, PokerGameplayViewModel } from "./pokerGameplayTypes";
+import { PokerPlayingCard } from "./PokerPlayingCard";
 
 interface PokerActionDockDesktopProps
   extends Pick<
@@ -68,9 +68,7 @@ export function PokerActionDockDesktop({
             const card = hero.cards[idx];
             const hidden = hiddenCards || card === undefined;
             return (
-              <span key={idx} className={`poker-gameplay-card small ${hidden ? "face-down" : ""}`}>
-                {hidden ? "♠" : formatCard(card)}
-              </span>
+              <PokerPlayingCard key={idx} value={card} faceDown={hidden} size="hero" />
             );
           })}
         </div>

@@ -293,7 +293,22 @@ export async function fetchHandResults(
                 communityCards: parseCards(data.community_cards),
                 totalPot: Number(data.total_pot || 0),
             };
+        })
+        .sort((a, b) => {
+            if (b.handNumber !== a.handNumber) {
+                return b.handNumber - a.handNumber;
+            }
+            return b.timestamp - a.timestamp;
         });
+}
+
+export async function fetchHandResultForHand(
+    network: NetworkType,
+    tableAddress: string,
+    handNumber: number
+): Promise<HandResultEvent | null> {
+    const events = await fetchHandResults(network, tableAddress, 50);
+    return events.find((event) => event.handNumber === handNumber) ?? null;
 }
 
 // ============================================================================

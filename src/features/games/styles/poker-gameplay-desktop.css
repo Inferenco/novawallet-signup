@@ -3,6 +3,8 @@
   padding: 22px;
   display: grid;
   place-items: center;
+  --poker-desktop-seat-box-w: 92px;
+  --poker-desktop-seat-box-h: 118px;
 }
 
 .poker-gameplay-desktop-stage {
@@ -13,6 +15,12 @@
 
 .poker-gameplay-stage-desktop .poker-gameplay-stage-surface {
   min-height: 620px;
+}
+
+.poker-gameplay-stage-desktop .poker-gameplay-seat {
+  width: var(--poker-desktop-seat-box-w);
+  height: var(--poker-desktop-seat-box-h);
+  display: block;
 }
 
 .poker-gameplay-stage-desktop .poker-gameplay-table-oval {
@@ -45,20 +53,73 @@
   bottom: 18px;
   left: 50%;
   transform: translateX(-50%);
+  width: 104px;
+  height: 128px;
 }
 
 .poker-gameplay-stage-desktop .poker-gameplay-seat-left .poker-gameplay-seat-bet,
 .poker-gameplay-stage-desktop .poker-gameplay-seat-right .poker-gameplay-seat-bet {
-  top: 12px;
+  top: -12px;
 }
 
 .poker-gameplay-stage-desktop .poker-gameplay-seat-top-left .poker-gameplay-seat-bet,
 .poker-gameplay-stage-desktop .poker-gameplay-seat-top-right .poker-gameplay-seat-bet {
-  bottom: -16px;
+  top: auto;
+  bottom: -10px;
 }
 
 .poker-gameplay-stage-desktop .poker-gameplay-seat-bottom .poker-gameplay-seat-bet {
-  top: -16px;
+  top: -30px;
+}
+
+.poker-gameplay-stage-desktop .poker-gameplay-seat-avatar {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.poker-gameplay-stage-desktop .poker-gameplay-seat-dealer {
+  top: 4px;
+  right: 22px;
+}
+
+.poker-gameplay-stage-desktop .poker-gameplay-seat-meta {
+  position: absolute;
+  top: 64px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  gap: 3px;
+}
+
+.poker-gameplay-stage-desktop .poker-gameplay-seat-bet {
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.poker-gameplay-stage-desktop .poker-gameplay-pot-pill {
+  top: 106px;
+}
+
+.poker-gameplay-stage-desktop .poker-gameplay-seat-left .poker-gameplay-seat-avatar,
+.poker-gameplay-stage-desktop .poker-gameplay-seat-right .poker-gameplay-seat-avatar {
+  top: 18px;
+}
+
+.poker-gameplay-stage-desktop .poker-gameplay-seat-left .poker-gameplay-seat-dealer,
+.poker-gameplay-stage-desktop .poker-gameplay-seat-right .poker-gameplay-seat-dealer {
+  top: 22px;
+}
+
+.poker-gameplay-stage-desktop .poker-gameplay-seat-left .poker-gameplay-seat-meta,
+.poker-gameplay-stage-desktop .poker-gameplay-seat-right .poker-gameplay-seat-meta {
+  top: 88px;
+}
+
+.poker-gameplay-dock-desktop .poker-gameplay-card.size-hero {
+  width: clamp(38px, 3.4vw, 52px);
 }
 
 .poker-gameplay-desktop-controls {
@@ -89,6 +150,8 @@
 @media (max-width: 1199px) {
   .poker-gameplay-shell-desktop {
     padding: 16px;
+    --poker-desktop-seat-box-w: 86px;
+    --poker-desktop-seat-box-h: 110px;
   }
 
   .poker-gameplay-stage-desktop .poker-gameplay-stage-surface {

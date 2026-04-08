@@ -21,9 +21,11 @@ export function PokerGameplayHeader({
 }: PokerGameplayHeaderProps) {
   return (
     <header className="games-wallet-header">
-      <Link className="games-wallet-icon-btn" to="/games/poker">
-        Back
-      </Link>
+      <div className="games-wallet-header-left">
+        <Link className="games-wallet-icon-btn games-wallet-header-back" to="/games/poker">
+          Back
+        </Link>
+      </div>
 
       <div className="games-wallet-header-center">
         <img
@@ -31,7 +33,7 @@ export function PokerGameplayHeader({
           src="/assets/casino/game-icon.png"
           alt="Nova"
         />
-        <div>
+        <div className="games-wallet-header-copy">
           <p className="games-wallet-table-name">{tableName}</p>
           <p className="games-wallet-table-meta">{blindsLabel}</p>
         </div>

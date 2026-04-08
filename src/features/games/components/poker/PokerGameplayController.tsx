@@ -31,7 +31,7 @@ import { usePolling } from "../../utils/poker/polling";
 import { GAME_PHASES, PHASE_NAMES } from "../../config/games";
 import { parsePokerError } from "../../utils/poker/errors";
 import { formatChips } from "../../services/poker/chips";
-import { fetchHandResults } from "../../services/poker/indexer";
+import { fetchHandResultForHand } from "../../services/poker/indexer";
 import { getProfiles, type UserProfile } from "../../services/profiles";
 import { deriveThemeFromColor } from "../../utils/theme";
 import { useChatContext } from "../../context/chat";
@@ -379,6 +379,50 @@ export function PokerGameplayController({ tableAddress }: PokerGameplayControlle
   const processedHandsRef = useRef<Set<number>>(new Set());
   const latestHandRef = useRef(0);
 
+  const applyHandResultToShowdown = useCallback((event: {
+    handNumber: number;
+    resultType: number;
+    totalPot: number;
+    communityCards: number[];
+    showdownPlayers: string[];
+    showdownSeats: number[];
+    showdownHoleCards: number[][];
+    showdownHandTypes: number[];
+    winnerPlayers: string[];
+    winnerSeats: number[];
+    winnerAmounts: number[];
+  }) => {
+    const showdownPlayers = event.showdownPlayers.map((playerAddress, index) => ({
+      address: playerAddress,
+      seatIndex: event.showdownSeats[index] || 0,
+      holeCards: event.showdownHoleCards[index] || [],
+      handType: event.showdownHandTypes[index] || 0
+    }));
+
+    const winners = event.winnerPlayers.map((winnerAddress, index) => {
+      const seatIndex = event.winnerSeats[index] || 0;
+      const showdownIndex = event.showdownSeats.indexOf(seatIndex);
+
+      return {
+        address: winnerAddress,
+        amount: event.winnerAmounts[index] || 0,
+        holeCards: showdownIndex >= 0 ? event.showdownHoleCards[showdownIndex] || [] : [],
+        handType: showdownIndex >= 0 ? event.showdownHandTypes[showdownIndex] || 0 : 0,
+        seatIndex
+      };
+    });
+
+    setShowdownData({
+      visible: true,
+      winners,
+      resultType: event.resultType === 1 ? "fold_win" : "showdown",
+      totalPot: event.totalPot,
+      communityCards: event.communityCards,
+      handNumber: event.handNumber,
+      showdownPlayers
+    });
+  }, []);
+
   useEffect(() => {
     previousPhaseRef.current = null;
     previousHandNumberRef.current = null;
@@ -432,65 +476,58 @@ export function PokerGameplayController({ tableAddress }: PokerGameplayControlle
     }
 
     processedHandsRef.current.add(targetHand);
-    let attempt = 0;
-    const maxAttempts = 8;
+    let cancelled = false;
+    let retryTimeout: number | null = null;
+    const fastRetryDelays = [0, 250, 500, 750, 1000, 1500, 2000];
 
-    const fetchResult = () => {
-      void fetchHandResults(network, tableAddress, 10)
-        .then((events) => {
-          const event = events.find((entry) => entry.handNumber === targetHand);
-          if (event) {
-            const showdownPlayers = event.showdownPlayers.map((playerAddress, index) => ({
-              address: playerAddress,
-              seatIndex: event.showdownSeats[index] || 0,
-              holeCards: event.showdownHoleCards[index] || [],
-              handType: event.showdownHandTypes[index] || 0
-            }));
+    const pollForResult = (attemptIndex: number) => {
+      if (cancelled || latestHandRef.current > targetHand) {
+        return;
+      }
 
-            const winners = event.winnerPlayers.map((winnerAddress, index) => {
-              const seatIndex = event.winnerSeats[index] || 0;
-              const showdownIndex = event.showdownSeats.indexOf(seatIndex);
-
-              return {
-                address: winnerAddress,
-                amount: event.winnerAmounts[index] || 0,
-                holeCards: showdownIndex >= 0 ? event.showdownHoleCards[showdownIndex] || [] : [],
-                handType: showdownIndex >= 0 ? event.showdownHandTypes[showdownIndex] || 0 : 0,
-                seatIndex
-              };
-            });
-
-            if (latestHandRef.current > targetHand) {
-              return;
-            }
-
-            setShowdownData({
-              visible: true,
-              winners,
-              resultType: event.resultType === 1 ? "fold_win" : "showdown",
-              totalPot: event.totalPot,
-              communityCards: event.communityCards,
-              handNumber: event.handNumber,
-              showdownPlayers
-            });
+      void fetchHandResultForHand(network, tableAddress, targetHand)
+        .then((event) => {
+          if (cancelled || latestHandRef.current > targetHand) {
             return;
           }
 
-          if (attempt < maxAttempts) {
-            attempt += 1;
-            window.setTimeout(fetchResult, 1500);
+          if (event) {
+            applyHandResultToShowdown(event);
+            return;
           }
+
+          const nextAttemptIndex = attemptIndex + 1;
+          const nextDelay =
+            nextAttemptIndex < fastRetryDelays.length ? fastRetryDelays[nextAttemptIndex] : 3000;
+
+          retryTimeout = window.setTimeout(() => {
+            pollForResult(nextAttemptIndex);
+          }, nextDelay);
         })
         .catch(() => {
-          if (attempt < maxAttempts) {
-            attempt += 1;
-            window.setTimeout(fetchResult, 1500);
+          if (cancelled || latestHandRef.current > targetHand) {
+            return;
           }
+
+          const nextAttemptIndex = attemptIndex + 1;
+          const nextDelay =
+            nextAttemptIndex < fastRetryDelays.length ? fastRetryDelays[nextAttemptIndex] : 3000;
+
+          retryTimeout = window.setTimeout(() => {
+            pollForResult(nextAttemptIndex);
+          }, nextDelay);
         });
     };
 
-    fetchResult();
-  }, [network, phase, tableAddress, tableState?.handNumber]);
+    pollForResult(0);
+
+    return () => {
+      cancelled = true;
+      if (retryTimeout !== null) {
+        window.clearTimeout(retryTimeout);
+      }
+    };
+  }, [applyHandResultToShowdown, network, phase, tableAddress, tableState?.handNumber]);
 
   const requireSigner = useCallback(() => {
     if (!contractsReady) {
@@ -775,9 +812,7 @@ export function PokerGameplayController({ tableAddress }: PokerGameplayControlle
     });
   }, []);
 
-  const buyInBbMin = summary?.bigBlind ? Math.floor(summary.minBuyIn / summary.bigBlind) : 0;
-  const buyInBbMax = summary?.bigBlind ? Math.floor(summary.maxBuyIn / summary.bigBlind) : 0;
-  const blindsLabel = `Blinds ${summary?.smallBlind ?? 0}/${summary?.bigBlind ?? 0} • Buy-In ${buyInBbMin}-${buyInBbMax} BB`;
+  const blindsLabel = `Blinds ${summary?.smallBlind ?? 0}/${summary?.bigBlind ?? 0} BB`;
 
   const handleCommitPrompt = useCallback(() => {
     void runAction(async (activeSigner) => commitReveal.commit(activeSigner));

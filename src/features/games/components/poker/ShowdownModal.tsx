@@ -1,7 +1,7 @@
 import { HAND_RANKS } from "../../config/games";
 import { type UserProfile } from "../../services/profiles";
 import { formatChips } from "../../services/poker/chips";
-import { formatCard } from "../../utils/poker/cards";
+import { PokerPlayingCard } from "./PokerPlayingCard";
 import "../../styles/poker-modals.css";
 
 interface WinnerSummary {
@@ -81,9 +81,12 @@ export function ShowdownModal({
             <p className="games-field-label">Board</p>
             <div className="games-board-row">
               {communityCards.map((card, index) => (
-                <span key={`${card}-${index}`} className="games-showdown-card">
-                  {formatCard(card)}
-                </span>
+                <PokerPlayingCard
+                  key={`${card}-${index}`}
+                  value={card}
+                  size="showdown"
+                  className="games-showdown-card"
+                />
               ))}
             </div>
           </div>
@@ -124,9 +127,12 @@ export function ShowdownModal({
                 </div>
                 <div className="games-board-row">
                   {player.holeCards.map((card, index) => (
-                    <span key={`${player.address}-${index}`} className="games-showdown-card small">
-                      {formatCard(card)}
-                    </span>
+                    <PokerPlayingCard
+                      key={`${player.address}-${index}`}
+                      value={card}
+                      size="mini"
+                      className="games-showdown-card small"
+                    />
                   ))}
                 </div>
               </div>

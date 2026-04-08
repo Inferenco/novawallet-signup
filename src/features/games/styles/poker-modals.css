@@ -307,23 +307,7 @@
 }
 
 .games-showdown-card {
-  min-width: 44px;
-  min-height: 60px;
-  padding: 0 8px;
-  border-radius: 12px;
-  border: 1px solid rgba(120, 163, 204, 0.28);
-  background: linear-gradient(180deg, #fbfdff, #f0f4fb);
-  color: #09121c;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 800;
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.18);
-}
-
-.games-showdown-card.small {
-  min-width: 38px;
-  min-height: 54px;
+  flex: 0 0 auto;
 }
 
 @media (max-width: 639px) {
@@ -392,25 +376,6 @@
   gap: 8px;
 }
 
-.games-showdown-card {
-  min-width: 44px;
-  min-height: 58px;
-  padding: 10px 8px;
-  border-radius: 12px;
-  border: 1px solid rgba(113, 168, 255, 0.28);
-  background: rgba(12, 27, 52, 0.78);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 800;
-}
-
-.games-showdown-card.small {
-  min-width: 34px;
-  min-height: 46px;
-  padding: 8px 6px;
-}
-
 .games-showdown-row {
   display: flex;
   align-items: center;
@@ -420,6 +385,10 @@
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.games-showdown-row .games-board-row {
+  justify-content: flex-end;
 }
 
 @media (max-width: 639px) {
