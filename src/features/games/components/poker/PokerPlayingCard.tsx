@@ -8,6 +8,7 @@ interface PokerPlayingCardProps {
   faceDown?: boolean;
   size?: PokerPlayingCardSize;
   className?: string;
+  simplified?: boolean;
 }
 
 const PIP_LAYOUTS: Record<number, Array<{ x: number; y: number }>> = {
@@ -89,7 +90,8 @@ export function PokerPlayingCard({
   value,
   faceDown = false,
   size = "board",
-  className
+  className,
+  simplified = false
 }: PokerPlayingCardProps) {
   if (faceDown || value === undefined) {
     return (
@@ -135,6 +137,10 @@ export function PokerPlayingCard({
         ) : faceCard ? (
           <div className="poker-gameplay-card-face">
             <span className="poker-gameplay-card-face-rank">{card.rankSymbol}</span>
+            <span className="poker-gameplay-card-face-suit">{card.suitSymbol}</span>
+          </div>
+        ) : simplified ? (
+          <div className="poker-gameplay-card-face poker-gameplay-card-face-simple">
             <span className="poker-gameplay-card-face-suit">{card.suitSymbol}</span>
           </div>
         ) : (

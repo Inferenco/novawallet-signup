@@ -61,6 +61,9 @@ const CHIPS_ERROR_CODES: Record<number, string> = {
 
 // Common error message patterns
 const ERROR_PATTERNS: [RegExp, string][] = [
+    [/user has rejected the request/i, 'Transaction cancelled in wallet.'],
+    [/user rejected/i, 'Transaction cancelled in wallet.'],
+    [/rejected the request/i, 'Transaction cancelled in wallet.'],
     [/INSUFFICIENT_BALANCE_FOR_TRANSACTION_FEE/i, "You don't have enough CEDRA to pay for gas fees."],
     [/INSUFFICIENT_BALANCE/i, 'Insufficient balance to complete this action.'],
     [/E_ALREADY_CLAIMED_THIS_PERIOD/i, 'You already claimed free chips today'],

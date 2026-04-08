@@ -28,10 +28,13 @@ import { useOwnerActions } from "../../hooks/poker/useAdminActions";
 import { useTimeoutHandler } from "../../hooks/poker/useTimeoutHandler";
 import { useAbortVote } from "../../hooks/poker/useAbortVote";
 import { usePolling } from "../../utils/poker/polling";
-import { GAME_PHASES, PHASE_NAMES } from "../../config/games";
+import { GAME_PHASES, PHASE_NAMES, PLAYER_STATUS } from "../../config/games";
 import { parsePokerError } from "../../utils/poker/errors";
 import { formatChips } from "../../services/poker/chips";
-import { fetchHandResultForHand } from "../../services/poker/indexer";
+import {
+  fetchHandResultForHand,
+  fetchHoleCardsRevealedEvents
+} from "../../services/poker/indexer";
 import { getProfiles, type UserProfile } from "../../services/profiles";
 import { deriveThemeFromColor } from "../../utils/theme";
 import { useChatContext } from "../../context/chat";
@@ -58,6 +61,8 @@ import "../../styles/poker-gameplay-desktop.css";
 const NORMAL_POLL = 3000;
 const URGENT_POLL = 1000;
 const BACKGROUND_POLL = 10000;
+const SHOWDOWN_FOREGROUND_RETRY_DELAYS = [250, 500, 750, 1000, 1500, 2000];
+const SHOWDOWN_BACKGROUND_RETRY_DELAY = 5000;
 
 const DISPLAY_POSITIONS = ["bottom", "left", "top-left", "top-right", "right"] as const;
 
@@ -85,6 +90,7 @@ interface PokerGameplayControllerProps {
 
 interface ShowdownState {
   visible: boolean;
+  status: "idle" | "resolving" | "ready";
   winners: Array<{
     address: string;
     amount: number;
@@ -102,6 +108,12 @@ interface ShowdownState {
     holeCards: number[];
     handType: number;
   }>;
+}
+
+interface RevealedCardState {
+  seatIdx: number;
+  player: string;
+  holeCards: number[];
 }
 
 function getInitialLayoutMode(): PokerLayoutMode {
@@ -179,8 +191,11 @@ export function PokerGameplayController({ tableAddress }: PokerGameplayControlle
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [failedAvatarUrls, setFailedAvatarUrls] = useState<Set<string>>(new Set());
   const routeReadyForErrorsRef = useRef(false);
+  const [liveRevealedCards, setLiveRevealedCards] = useState<RevealedCardState[]>([]);
+  const [showdownRevealedCards, setShowdownRevealedCards] = useState<RevealedCardState[]>([]);
   const [showdownData, setShowdownData] = useState<ShowdownState>({
     visible: false,
+    status: "idle",
     winners: [],
     resultType: "showdown",
     totalPot: 0,
@@ -378,6 +393,27 @@ export function PokerGameplayController({ tableAddress }: PokerGameplayControlle
   const previousHandNumberRef = useRef<number | null>(null);
   const processedHandsRef = useRef<Set<number>>(new Set());
   const latestHandRef = useRef(0);
+  const currentHandNumber = tableState?.handNumber || 0;
+
+  const refreshLiveRevealedCards = useCallback(async () => {
+    if (!tableAddress) return;
+    if (phase < GAME_PHASES.PREFLOP || phase > GAME_PHASES.SHOWDOWN || currentHandNumber <= 0) {
+      setLiveRevealedCards([]);
+      return;
+    }
+
+    try {
+      const events = await fetchHoleCardsRevealedEvents(network, tableAddress, currentHandNumber);
+      const revealed = events.map((event) => ({
+        seatIdx: event.seatIdx,
+        player: event.player,
+        holeCards: event.holeCards
+      }));
+      setLiveRevealedCards(revealed);
+    } catch {
+      // ignore transient indexer failures
+    }
+  }, [currentHandNumber, network, phase, tableAddress]);
 
   const applyHandResultToShowdown = useCallback((event: {
     handNumber: number;
@@ -414,6 +450,7 @@ export function PokerGameplayController({ tableAddress }: PokerGameplayControlle
 
     setShowdownData({
       visible: true,
+      status: "ready",
       winners,
       resultType: event.resultType === 1 ? "fold_win" : "showdown",
       totalPot: event.totalPot,
@@ -429,10 +466,21 @@ export function PokerGameplayController({ tableAddress }: PokerGameplayControlle
     processedHandsRef.current = new Set();
     latestHandRef.current = 0;
     const id = window.setTimeout(() => {
-      setShowdownData((current) => (current.visible ? { ...current, visible: false } : current));
+      setLiveRevealedCards([]);
+      setShowdownRevealedCards([]);
+      setShowdownData((current) =>
+        current.visible ? { ...current, visible: false, status: "idle" } : { ...current, status: "idle" }
+      );
     }, 0);
     return () => window.clearTimeout(id);
   }, [tableAddress]);
+
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      void refreshLiveRevealedCards();
+    }, 0);
+    return () => window.clearTimeout(id);
+  }, [refreshLiveRevealedCards]);
 
   useEffect(() => {
     const prevPhase = previousPhaseRef.current;
@@ -460,7 +508,9 @@ export function PokerGameplayController({ tableAddress }: PokerGameplayControlle
     } else {
       if (currentHand > prevHand) {
         window.setTimeout(() => {
-          setShowdownData((current) => (current.visible ? { ...current, visible: false } : current));
+          setShowdownData((current) =>
+            current.visible ? { ...current, visible: false, status: "idle" } : { ...current, status: "idle" }
+          );
         }, 0);
       }
 
@@ -476,11 +526,48 @@ export function PokerGameplayController({ tableAddress }: PokerGameplayControlle
     }
 
     processedHandsRef.current.add(targetHand);
+    const resolvingId = window.setTimeout(() => {
+      setShowdownData((current) => ({ ...current, status: "resolving" }));
+      setShowdownRevealedCards([]);
+    }, 0);
     let cancelled = false;
     let retryTimeout: number | null = null;
-    const fastRetryDelays = [0, 250, 500, 750, 1000, 1500, 2000];
 
-    const pollForResult = (attemptIndex: number) => {
+    void fetchHoleCardsRevealedEvents(network, tableAddress, targetHand)
+      .then((revealedEvents) => {
+        if (cancelled || latestHandRef.current > targetHand) {
+          return;
+        }
+
+        setShowdownRevealedCards(
+          revealedEvents.map((revealed) => ({
+            seatIdx: revealed.seatIdx,
+            player: revealed.player,
+            holeCards: revealed.holeCards
+          }))
+        );
+      })
+      .catch(() => {
+        // reveal events are supplemental; ignore failure
+      });
+
+    const scheduleForegroundRetry = (attemptIndex: number) => {
+      if (attemptIndex >= SHOWDOWN_FOREGROUND_RETRY_DELAYS.length) {
+        retryTimeout = window.setTimeout(() => {
+          pollForResult("background");
+        }, SHOWDOWN_BACKGROUND_RETRY_DELAY);
+        return;
+      }
+
+      retryTimeout = window.setTimeout(() => {
+        pollForResult("foreground", attemptIndex);
+      }, SHOWDOWN_FOREGROUND_RETRY_DELAYS[attemptIndex]);
+    };
+
+    const pollForResult = (
+      mode: "foreground" | "background",
+      foregroundAttemptIndex: number = 0
+    ) => {
       if (cancelled || latestHandRef.current > targetHand) {
         return;
       }
@@ -496,33 +583,36 @@ export function PokerGameplayController({ tableAddress }: PokerGameplayControlle
             return;
           }
 
-          const nextAttemptIndex = attemptIndex + 1;
-          const nextDelay =
-            nextAttemptIndex < fastRetryDelays.length ? fastRetryDelays[nextAttemptIndex] : 3000;
+          if (mode === "foreground") {
+            scheduleForegroundRetry(foregroundAttemptIndex + 1);
+            return;
+          }
 
           retryTimeout = window.setTimeout(() => {
-            pollForResult(nextAttemptIndex);
-          }, nextDelay);
+            pollForResult("background");
+          }, SHOWDOWN_BACKGROUND_RETRY_DELAY);
         })
         .catch(() => {
           if (cancelled || latestHandRef.current > targetHand) {
             return;
           }
 
-          const nextAttemptIndex = attemptIndex + 1;
-          const nextDelay =
-            nextAttemptIndex < fastRetryDelays.length ? fastRetryDelays[nextAttemptIndex] : 3000;
+          if (mode === "foreground") {
+            scheduleForegroundRetry(foregroundAttemptIndex + 1);
+            return;
+          }
 
           retryTimeout = window.setTimeout(() => {
-            pollForResult(nextAttemptIndex);
-          }, nextDelay);
+            pollForResult("background");
+          }, SHOWDOWN_BACKGROUND_RETRY_DELAY);
         });
     };
 
-    pollForResult(0);
+    pollForResult("foreground", 0);
 
     return () => {
       cancelled = true;
+      window.clearTimeout(resolvingId);
       if (retryTimeout !== null) {
         window.clearTimeout(retryTimeout);
       }
@@ -547,14 +637,26 @@ export function PokerGameplayController({ tableAddress }: PokerGameplayControlle
 
   const myCurrentBet = mySeatIndex !== null && seats[mySeatIndex] ? seats[mySeatIndex].currentBet : 0;
   const myStack = mySeatIndex !== null && seats[mySeatIndex] ? seats[mySeatIndex].chipCount : 0;
+  const myStatus = mySeatIndex !== null && seats[mySeatIndex] ? seats[mySeatIndex].status : PLAYER_STATUS.WAITING;
   const callAmount = Math.max(0, maxCurrentBet - myCurrentBet);
   const canCheck = callAmount === 0;
   const inBettingRound = phase >= GAME_PHASES.PREFLOP && phase <= GAME_PHASES.RIVER;
   const activeSeatCount = seats.filter(
     (seat) => !isEmptySeat(seat.playerAddress) && !seat.isSittingOut && seat.chipCount > 0
   ).length;
-  const minRaiseTo = Math.max(minRaise, myCurrentBet + callAmount);
+  const minRaiseTo = maxCurrentBet + minRaise;
   const maxRaiseTo = myCurrentBet + myStack;
+  const isFoldedThisHand = mySeatIndex !== null && myStatus === PLAYER_STATUS.FOLDED;
+  const hasRevealedFolded = Boolean(
+    address &&
+      liveRevealedCards.some((revealed) => revealed.player.toLowerCase() === address.toLowerCase())
+  );
+  const canRevealFolded =
+    Boolean(address) &&
+    inBettingRound &&
+    isFoldedThisHand &&
+    !hasRevealedFolded &&
+    tableActions.pendingAction !== "revealHoleCards";
 
   const runAction = useCallback(
     async (
@@ -692,16 +794,27 @@ export function PokerGameplayController({ tableAddress }: PokerGameplayControlle
       const seatAddress = seat.playerAddress;
       const profile = getProfileForAddress(seatAddress);
       const isActive = actionInfo?.seatIdx === actualSeatIndex && inBettingRound;
+      const revealedForSeat = liveRevealedCards.find((revealed) => revealed.seatIdx === actualSeatIndex);
 
       return {
         actualSeatIndex,
         displayPosition: DISPLAY_POSITIONS[displayPos] || "bottom",
         seat,
         profile,
-        isActive
+        isActive,
+        revealedHoleCards: revealedForSeat?.holeCards,
+        isRevealedFolded: Boolean(revealedForSeat)
       };
     });
-  }, [summary?.totalSeats, seats, mySeatIndex, getProfileForAddress, actionInfo?.seatIdx, inBettingRound]);
+  }, [
+    summary?.totalSeats,
+    seats,
+    mySeatIndex,
+    getProfileForAddress,
+    actionInfo?.seatIdx,
+    inBettingRound,
+    liveRevealedCards
+  ]);
 
   const canStartHand = Boolean(
     summary &&
@@ -727,8 +840,8 @@ export function PokerGameplayController({ tableAddress }: PokerGameplayControlle
     }
 
     if (mySeatIndex !== utgSeat) return false;
-    return maxCurrentBet <= summary.bigBlind;
-  }, [summary, phase, mySeatIndex, tableState, isMyTurn, seats, maxCurrentBet]);
+    return maxCurrentBet <= summary.bigBlind && myStack >= summary.bigBlind * 2;
+  }, [summary, phase, mySeatIndex, tableState, isMyTurn, seats, maxCurrentBet, myStack]);
 
   const statusMessage = useMemo(() => {
     if (summary?.isPaused) return "Table paused";
@@ -772,7 +885,8 @@ export function PokerGameplayController({ tableAddress }: PokerGameplayControlle
 
   useEffect(() => {
     if (!showOwnerPanel && !showAbortPanel && !showJoinModal && !showdownData.visible) return;
-    setShowChat(false);
+    const id = window.setTimeout(() => setShowChat(false), 0);
+    return () => window.clearTimeout(id);
   }, [showAbortPanel, showJoinModal, showOwnerPanel, showdownData.visible]);
 
   const pendingActionCopy = useMemo(() => {
@@ -901,7 +1015,10 @@ export function PokerGameplayController({ tableAddress }: PokerGameplayControlle
         raiseToAmount,
         raiseRatio,
         minRaiseTo,
-        maxRaiseTo
+        maxRaiseTo,
+        isFolded: isFoldedThisHand,
+        canRevealFolded,
+        hasRevealedFolded
       },
       tableSeats: rotatedSeatData,
       controls: {
@@ -935,6 +1052,7 @@ export function PokerGameplayController({ tableAddress }: PokerGameplayControlle
       canCheck,
       canStartHand,
       canStraddle,
+      canRevealFolded,
       chipActions.chipBalance,
       communityCards,
       inBettingRound,
@@ -943,6 +1061,7 @@ export function PokerGameplayController({ tableAddress }: PokerGameplayControlle
       isMyTurn,
       maxRaiseTo,
       minRaiseTo,
+      hasRevealedFolded,
       myAvatarBlocked,
       myCardsDecrypted,
       myHoleCards,
@@ -970,6 +1089,7 @@ export function PokerGameplayController({ tableAddress }: PokerGameplayControlle
       timerState.secondsRemaining,
       timeoutHandler.canCallTimeout,
       timeoutHandler.isPending,
+      isFoldedThisHand,
       unreadCount
     ]
   );
@@ -1019,6 +1139,10 @@ export function PokerGameplayController({ tableAddress }: PokerGameplayControlle
         pushToast("error", `Raise must be at least ${formatChips(minRaiseTo)}.`);
         return;
       }
+      if (parsed > maxRaiseTo) {
+        pushToast("error", `Raise cannot exceed ${formatChips(maxRaiseTo)}.`);
+        return;
+      }
       void runAction((activeSigner) => bettingActions.doRaise(activeSigner, BigInt(parsed)), {
         lockOnSuccess: true
       });
@@ -1035,6 +1159,7 @@ export function PokerGameplayController({ tableAddress }: PokerGameplayControlle
     onSitIn: () => void runAction((activeSigner) => tableActions.doSitIn(activeSigner)),
     onStartHand: () => void runAction((activeSigner) => tableActions.doStartHand(activeSigner)),
     onLeaveTable: () => void runAction((activeSigner) => tableActions.doLeave(activeSigner)),
+    onRevealFoldedCards: () => void runAction((activeSigner) => tableActions.doRevealHoleCards(activeSigner)),
     onTimeout: handleTimeoutAction,
     onAbort: () => {
       setShowChat(false);
@@ -1308,15 +1433,18 @@ export function PokerGameplayController({ tableAddress }: PokerGameplayControlle
 
       <ShowdownModal
         visible={showdownData.visible}
+        status={showdownData.status}
         handNumber={showdownData.handNumber}
         resultType={showdownData.resultType}
         totalPot={showdownData.totalPot}
         communityCards={showdownData.communityCards}
         winners={showdownData.winners}
         showdownPlayers={showdownData.showdownPlayers}
+        revealedCards={showdownRevealedCards}
         playerProfiles={playerProfiles}
         onClose={() => {
-          setShowdownData((current) => ({ ...current, visible: false }));
+          setShowdownData((current) => ({ ...current, visible: false, status: "idle" }));
+          setShowdownRevealedCards([]);
           void poll();
         }}
       />

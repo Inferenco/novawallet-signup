@@ -149,6 +149,16 @@
   top: -12px;
 }
 
+.poker-gameplay-shell-mobile .poker-gameplay-seat-revealed-cards {
+  top: calc(var(--poker-mobile-seat-avatar) + 2px);
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.poker-gameplay-shell-mobile .poker-gameplay-seat-bottom .poker-gameplay-seat-revealed-cards {
+  top: 2px;
+}
+
 .poker-gameplay-stage-mobile .poker-gameplay-pot-pill {
   top: 60px;
 }

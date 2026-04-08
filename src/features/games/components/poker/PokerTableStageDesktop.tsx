@@ -55,7 +55,8 @@ export function PokerTableStageDesktop({
           </div>
         </div>
 
-        {viewModel.tableSeats.map(({ actualSeatIndex, displayPosition, seat, profile, isActive }) => {
+        {viewModel.tableSeats.map(
+          ({ actualSeatIndex, displayPosition, seat, profile, isActive, revealedHoleCards, isRevealedFolded }) => {
           const empty = isEmptySeat(seat.playerAddress);
           const canJoinThisSeat = empty && !viewModel.hero.seated;
           const isFolded = seat.status === PLAYER_STATUS.FOLDED;
@@ -71,7 +72,7 @@ export function PokerTableStageDesktop({
           const isDealer = viewModel.table.dealerSeat === actualSeatIndex;
           const isHero = viewModel.table.heroSeatIndex === actualSeatIndex;
 
-          return (
+            return (
             <button
               key={actualSeatIndex}
               type="button"
@@ -128,9 +129,18 @@ export function PokerTableStageDesktop({
                   {isAllIn ? <span className="poker-gameplay-seat-allin">ALL-IN</span> : null}
                 </span>
               ) : null}
+
+              {isRevealedFolded && revealedHoleCards && revealedHoleCards.length > 0 ? (
+                <span className="poker-gameplay-seat-revealed-cards" aria-label="Revealed folded cards">
+                  {revealedHoleCards.slice(0, 2).map((card, index) => (
+                    <PokerPlayingCard key={`${actualSeatIndex}-${index}`} value={card} size="mini" />
+                  ))}
+                </span>
+              ) : null}
             </button>
-          );
-        })}
+            );
+          }
+        )}
       </div>
     </section>
   );

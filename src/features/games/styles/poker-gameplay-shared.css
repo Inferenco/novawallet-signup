@@ -392,6 +392,10 @@
   text-align: center;
 }
 
+.poker-gameplay-card-face-simple .poker-gameplay-card-face-suit {
+  font-size: calc(var(--poker-card-ace-size) * 0.9);
+}
+
 .poker-gameplay-card-face-rank {
   font-size: var(--poker-card-face-rank-size);
   font-weight: 900;
@@ -553,6 +557,18 @@
   z-index: 5;
   min-width: 0;
   color: #ffe8ad;
+}
+
+.poker-gameplay-seat-revealed-cards {
+  position: absolute;
+  z-index: 4;
+  display: flex;
+  gap: 4px;
+}
+
+.poker-gameplay-seat-revealed-cards .poker-gameplay-card.size-mini {
+  width: 20px;
+  border-radius: 6px;
 }
 
 .poker-gameplay-seat-allin {
@@ -750,12 +766,26 @@
   display: flex;
   align-items: center;
   justify-content: flex-start;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .poker-gameplay-dock-pending {
   font-size: 0.68rem;
   font-weight: 700;
   color: rgba(205, 215, 224, 0.72);
+}
+
+.poker-gameplay-dock-inline-action {
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(104, 230, 190, 0.24);
+  background: rgba(24, 117, 91, 0.18);
+  color: #c8f4e7;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1;
 }
 
 .poker-gameplay-dock .games-wallet-text-input {

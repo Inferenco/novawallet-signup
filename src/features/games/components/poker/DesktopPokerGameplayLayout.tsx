@@ -21,6 +21,7 @@ export function DesktopPokerGameplayLayout({
   onPreset,
   onRaise,
   onRaiseInputChange,
+  onRevealFoldedCards,
   onSitIn,
   onSitOut,
   onSliderChange,
@@ -102,6 +103,7 @@ export function DesktopPokerGameplayLayout({
               onPreset={onPreset}
               onRaise={onRaise}
               onRaiseInputChange={onRaiseInputChange}
+              onRevealFoldedCards={onRevealFoldedCards}
               onSitIn={onSitIn}
               onSitOut={onSitOut}
               onSliderChange={onSliderChange}

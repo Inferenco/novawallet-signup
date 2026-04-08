@@ -23,6 +23,7 @@ export function MobilePokerGameplayLayout({
   onPreset,
   onRaise,
   onRaiseInputChange,
+  onRevealFoldedCards,
   onSitIn,
   onSitOut,
   onSliderChange,
@@ -144,6 +145,7 @@ export function MobilePokerGameplayLayout({
                 onPreset={onPreset}
                 onRaise={onRaise}
                 onRaiseInputChange={onRaiseInputChange}
+                onRevealFoldedCards={onRevealFoldedCards}
                 onSitIn={onSitIn}
                 onSitOut={onSitOut}
                 onSliderChange={onSliderChange}

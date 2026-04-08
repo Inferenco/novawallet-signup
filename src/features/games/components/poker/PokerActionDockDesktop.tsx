@@ -18,6 +18,7 @@ interface PokerActionDockDesktopProps
       | "onSitOut"
       | "onSliderChange"
       | "onStraddle"
+      | "onRevealFoldedCards"
     > {
   viewModel: PokerGameplayViewModel;
   onAvatarError: (avatarUrl: string) => void;
@@ -34,6 +35,7 @@ export function PokerActionDockDesktop({
   onRaise,
   onRaiseInputChange,
   onPreset,
+  onRevealFoldedCards,
   onSitIn,
   onSitOut,
   onSliderChange,
@@ -193,6 +195,11 @@ export function PokerActionDockDesktop({
         <button type="button" className="poker-gameplay-pill-button" onClick={onAbort}>
           Abort
         </button>
+        {hero.canRevealFolded ? (
+          <button type="button" className="poker-gameplay-pill-button" onClick={onRevealFoldedCards}>
+            Reveal Cards
+          </button>
+        ) : null}
         <span className="poker-gameplay-dock-pending">{hero.pendingActionCopy}</span>
       </div>
     </section>

@@ -118,6 +118,16 @@
   top: 88px;
 }
 
+.poker-gameplay-stage-desktop .poker-gameplay-seat-revealed-cards {
+  top: 68px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.poker-gameplay-stage-desktop .poker-gameplay-seat-bottom .poker-gameplay-seat-revealed-cards {
+  top: 8px;
+}
+
 .poker-gameplay-dock-desktop .poker-gameplay-card.size-hero {
   width: clamp(38px, 3.4vw, 52px);
 }

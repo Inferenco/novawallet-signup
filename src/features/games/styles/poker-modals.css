@@ -310,6 +310,15 @@
   flex: 0 0 auto;
 }
 
+.games-showdown-status {
+  margin: 0;
+  color: rgba(205, 215, 224, 0.76);
+}
+
+.games-showdown-subsection {
+  margin-top: 4px;
+}
+
 @media (max-width: 639px) {
   .games-chat-panel {
     width: 100%;

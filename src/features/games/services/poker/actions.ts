@@ -225,6 +225,19 @@ export async function revealSecret(
     ]);
 }
 
+/**
+ * Reveal folded hole cards for audit trail.
+ */
+export async function revealHoleCards(
+    network: NetworkType,
+    signer: GameSigner,
+    tableAddress: string
+): Promise<TransactionResult> {
+    return submitTransaction(network, signer, 'TEXAS_HOLDEM', 'reveal_hole_cards', [
+        tableAddress,
+    ]);
+}
+
 // ============================================================================
 // Betting Actions
 // ============================================================================

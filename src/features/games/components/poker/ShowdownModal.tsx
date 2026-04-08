@@ -21,12 +21,14 @@ interface ShowdownPlayerSummary {
 
 interface ShowdownModalProps {
   visible: boolean;
+  status?: "idle" | "resolving" | "ready";
   handNumber: number;
   resultType: "showdown" | "fold_win";
   totalPot: number;
   communityCards: number[];
   winners: WinnerSummary[];
   showdownPlayers: ShowdownPlayerSummary[];
+  revealedCards?: Array<{ seatIdx: number; player: string; holeCards: number[] }>;
   playerProfiles: Map<string, UserProfile | null>;
   onClose: () => void;
 }
@@ -40,12 +42,14 @@ function displayName(
 
 export function ShowdownModal({
   visible,
+  status = "ready",
   handNumber,
   resultType,
   totalPot,
   communityCards,
   winners,
   showdownPlayers,
+  revealedCards = [],
   playerProfiles,
   onClose
 }: ShowdownModalProps) {
@@ -75,6 +79,10 @@ export function ShowdownModal({
           </span>
           <strong>{formatChips(totalPot)}</strong>
         </div>
+
+        {status === "resolving" ? (
+          <p className="games-status-text games-showdown-status">Resolving final hand details…</p>
+        ) : null}
 
         {resultType !== "fold_win" && communityCards.length > 0 ? (
           <div className="games-section">
@@ -129,6 +137,32 @@ export function ShowdownModal({
                   {player.holeCards.map((card, index) => (
                     <PokerPlayingCard
                       key={`${player.address}-${index}`}
+                      value={card}
+                      size="mini"
+                      className="games-showdown-card small"
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : null}
+
+        {revealedCards.length > 0 ? (
+          <div className="games-section games-showdown-subsection">
+            <p className="games-field-label">Revealed Folded Hands</p>
+            {revealedCards.map((player) => (
+              <div key={`${player.player}-${player.seatIdx}`} className="games-showdown-row">
+                <div>
+                  <p className="games-section-title" style={{ fontSize: "1rem" }}>
+                    {displayName(playerProfiles, player.player)}
+                  </p>
+                  <p className="games-section-copy">Seat {player.seatIdx + 1} • Folded and revealed</p>
+                </div>
+                <div className="games-board-row">
+                  {player.holeCards.map((card, index) => (
+                    <PokerPlayingCard
+                      key={`${player.player}-${index}`}
                       value={card}
                       size="mini"
                       className="games-showdown-card small"

@@ -14,6 +14,8 @@ export interface PokerDisplaySeat {
   };
   profile: UserProfile | null;
   isActive: boolean;
+  revealedHoleCards?: number[];
+  isRevealedFolded?: boolean;
 }
 
 export interface PokerGameplayViewModel {
@@ -53,6 +55,9 @@ export interface PokerGameplayViewModel {
     raiseRatio: number;
     minRaiseTo: number;
     maxRaiseTo: number;
+    isFolded: boolean;
+    canRevealFolded: boolean;
+    hasRevealedFolded: boolean;
   };
   tableSeats: PokerDisplaySeat[];
   controls: {
@@ -95,6 +100,7 @@ export interface PokerGameplayActionHandlers {
   onSitIn: () => void;
   onStartHand: () => void;
   onLeaveTable: () => void;
+  onRevealFoldedCards: () => void;
   onTimeout: () => void;
   onAbort: () => void;
 }

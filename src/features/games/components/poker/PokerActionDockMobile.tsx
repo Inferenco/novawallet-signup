@@ -18,6 +18,7 @@ interface PokerActionDockMobileProps
       | "onSitOut"
       | "onSliderChange"
       | "onStraddle"
+      | "onRevealFoldedCards"
     > {
   viewModel: PokerGameplayViewModel;
   compact: boolean;
@@ -36,6 +37,7 @@ export function PokerActionDockMobile({
   onRaise,
   onRaiseInputChange,
   onPreset,
+  onRevealFoldedCards,
   onSitIn,
   onSitOut,
   onSliderChange,
@@ -73,7 +75,13 @@ export function PokerActionDockMobile({
             const card = hero.cards[idx];
             const hidden = hiddenCards || card === undefined;
             return (
-              <PokerPlayingCard key={idx} value={card} faceDown={hidden} size="hero" />
+              <PokerPlayingCard
+                key={idx}
+                value={card}
+                faceDown={hidden}
+                size="hero"
+                simplified={!hidden}
+              />
             );
           })}
         </div>
@@ -193,6 +201,11 @@ export function PokerActionDockMobile({
       </div>
 
       <div className="poker-gameplay-dock-footer">
+        {hero.canRevealFolded ? (
+          <button type="button" className="poker-gameplay-dock-inline-action" onClick={onRevealFoldedCards}>
+            Reveal Cards
+          </button>
+        ) : null}
         <span className="poker-gameplay-dock-pending">{hero.pendingActionCopy}</span>
       </div>
     </section>
