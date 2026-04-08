@@ -44,7 +44,6 @@ export function PokerTablesPage() {
     hasMore,
     loadMoreTables,
     isLoadingMore,
-    lastRefresh,
     setMyTable,
     upsertTable
   } = usePokerTablesStore();
@@ -85,7 +84,7 @@ export function PokerTablesPage() {
     return () => {
       cancelled = true;
     };
-  }, [address, lastRefresh, network, setMyTable, upsertTable, wallet.connected]);
+  }, [address, network, setMyTable, upsertTable, wallet.connected]);
 
   useEffect(() => {
     if (filteredTables.length === 0) return;

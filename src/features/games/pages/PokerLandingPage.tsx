@@ -55,7 +55,7 @@ export function PokerLandingPage() {
   const { pushToast } = useToast();
   const address = wallet.account?.address?.toString() ?? "";
   const { balance: cedraBalance, refreshBalance: refreshCedraBalance } = useCedraBalance(address);
-  const { tables, refreshTables, lastRefresh, setMyTable, upsertTable, removeTable } =
+  const { tables, refreshTables, setMyTable, upsertTable, removeTable } =
     usePokerTablesStore();
   const chipActions = useChipActions({ network, playerAddress: address });
   const { refreshBalance: refreshChipBalance } = chipActions;
@@ -123,7 +123,6 @@ export function PokerLandingPage() {
   }, [
     address,
     existingOwnedTableAddress,
-    lastRefresh,
     network,
     removeTable,
     setMyTable,

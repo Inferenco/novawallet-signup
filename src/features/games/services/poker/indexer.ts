@@ -60,7 +60,6 @@ export interface DiscoveredTable extends TableSummary {
 // ============================================================================
 
 const GRAPHQL_ENDPOINT = CHAIN_CONFIG.gamesIndexerUrl;
-const INDEXER_REQUEST_TIMEOUT_MS = 8_000;
 
 interface GraphQLResponse<T> {
     data?: T;
@@ -71,44 +70,39 @@ async function queryIndexer<T>(
     network: NetworkType,
     query: string,
     variables: Record<string, unknown> = {}
-): Promise<T | null> {
+): Promise<T> {
     // For now, we only support Cedra testnet indexer
     if (network !== 'testnet') {
-        console.warn('Indexer only available on testnet');
-        return null;
+        throw new Error('Indexer only available on testnet');
     }
 
     try {
-        const controller = new AbortController();
-        const timeout = globalThis.setTimeout(() => controller.abort(), INDEXER_REQUEST_TIMEOUT_MS);
-        try {
-            const response = await fetch(GRAPHQL_ENDPOINT, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ query, variables }),
-                signal: controller.signal,
-            });
+        const response = await fetch(GRAPHQL_ENDPOINT, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ query, variables }),
+        });
 
-            const result: GraphQLResponse<T> = await response.json();
-
-            if (result.errors) {
-                console.error('[Indexer] GraphQL errors:', result.errors);
-                return null;
-            }
-
-            return result.data ?? null;
-        } finally {
-            globalThis.clearTimeout(timeout);
+        if (!response.ok) {
+            throw new Error(`Indexer request failed with status ${response.status}`);
         }
+
+        const result: GraphQLResponse<T> = await response.json();
+
+        if (result.errors?.length) {
+            throw new Error(result.errors.map((error) => error.message).join('; '));
+        }
+
+        if (result.data === undefined) {
+            throw new Error('Indexer response did not include data');
+        }
+
+        return result.data;
     } catch (error) {
-        if (error instanceof Error && error.name === 'AbortError') {
-            console.warn('[Indexer] Query timed out:', { endpoint: GRAPHQL_ENDPOINT, variables });
-            return null;
-        }
         console.error('[Indexer] Query failed:', error);
-        return null;
+        throw error;
     }
 }
 
@@ -158,7 +152,7 @@ export async function fetchTableCreatedEvents(
         events: Array<{ type: string; data: any; transaction_version: string }>;
     }>(network, query, { eventTypes, limit });
 
-    if (!result?.events) return [];
+    if (!result.events) return [];
 
     return result.events.map(e => ({
         tableAddress: normalizeAddress(e.data.table_addr || e.data.table_address || e.data.tableAddress || ''),
@@ -196,7 +190,7 @@ export async function fetchTableClosedEvents(
         events: Array<{ type: string; data: any; transaction_version: string }>;
     }>(network, query, { eventTypes, limit });
 
-    if (!result?.events) return [];
+    if (!result.events) return [];
 
     return result.events.map(e => ({
         tableAddress: normalizeAddress(e.data.table_addr || e.data.table_address || e.data.tableAddress || ''),
@@ -234,7 +228,7 @@ export async function fetchHandResults(
         events: Array<{ type: string; data: any; transaction_version: string }>;
     }>(network, query, { eventTypes, limit });
 
-    if (!result?.events) return [];
+    if (!result.events) return [];
 
     // Helper to safely get array from data
     const safeArray = (val: any): any[] => {
