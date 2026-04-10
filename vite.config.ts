@@ -9,7 +9,13 @@ export default defineConfig(({ mode }) => {
     base: env.VITE_BASE_PATH || "/",
     plugins: [react()],
     server: {
-      allowedHosts: true
+      allowedHosts: true,
+      proxy: {
+        '/v1/graphql': {
+          target: 'https://graphql.cedra.dev',
+          changeOrigin: true,
+        },
+      },
     },
     resolve: {
       alias: {

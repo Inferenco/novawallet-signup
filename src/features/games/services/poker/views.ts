@@ -8,11 +8,48 @@ import { isEmptyAddress, normalizeAddress } from '../../utils/address';
 import type {
     AbortStatus,
     ActionInfo,
+    LastHandResult,
     SeatInfo,
     TableConfig,
     TableState,
     TableSummary,
 } from './types';
+
+function hexStringToBytes(hex: string): number[] {
+    if (!hex || hex === '0x') return [];
+    const cleanHex = hex.startsWith('0x') ? hex.slice(2) : hex;
+    const paddedHex = cleanHex.length % 2 === 0 ? cleanHex : `0${cleanHex}`;
+    const bytes: number[] = [];
+
+    for (let i = 0; i < paddedHex.length; i += 2) {
+        bytes.push(parseInt(paddedHex.slice(i, i + 2), 16));
+    }
+
+    return bytes;
+}
+
+function parseByteVector(value: unknown): number[] {
+    if (Array.isArray(value)) {
+        return value.map(Number);
+    }
+
+    if (typeof value === 'string') {
+        if (value.startsWith('0x')) {
+            return hexStringToBytes(value);
+        }
+
+        try {
+            const parsed = JSON.parse(value);
+            if (Array.isArray(parsed)) {
+                return parsed.map(Number);
+            }
+        } catch {
+            return [];
+        }
+    }
+
+    return [];
+}
 
 // ============================================================================
 // Table Metadata
@@ -93,6 +130,40 @@ export async function getTableState(
         handNumber: Number(result[0]),
         dealerSeat: Number(result[1]),
         nextBigBlindSeat: Number(result[2]),
+    };
+}
+
+/**
+ * Get the most recent completed hand result stored on-chain.
+ */
+export async function getLastHandResult(
+    network: NetworkType,
+    tableAddress: string
+): Promise<LastHandResult> {
+    const result = await callView<any[]>(
+        network,
+        'TEXAS_HOLDEM',
+        'get_last_hand_result',
+        [tableAddress]
+    );
+
+    return {
+        exists: Boolean(result[0]),
+        handNumber: Number(result[1] ?? 0),
+        resultType: Number(result[2] ?? 0),
+        timestamp: Number(result[3] ?? 0),
+        communityCards: parseByteVector(result[4]),
+        showdownSeats: Array.isArray(result[5]) ? result[5].map(Number) : [],
+        showdownPlayers: Array.isArray(result[6]) ? result[6].map((player) => normalizeAddress(player as string)) : [],
+        showdownHoleCards: Array.isArray(result[7])
+            ? result[7].map((cards) => parseByteVector(cards))
+            : [],
+        showdownHandTypes: parseByteVector(result[8]),
+        winnerSeats: Array.isArray(result[9]) ? result[9].map(Number) : [],
+        winnerPlayers: Array.isArray(result[10]) ? result[10].map((player) => normalizeAddress(player as string)) : [],
+        winnerAmounts: Array.isArray(result[11]) ? result[11].map(Number) : [],
+        totalPot: Number(result[12] ?? 0),
+        totalFees: Number(result[13] ?? 0),
     };
 }
 
@@ -284,21 +355,6 @@ export async function getCommunityCards(
     }
 
     return [];
-}
-
-/**
- * Convert a hex string like "0x176b" to an array of bytes [0x17, 0x6b]
- */
-function hexStringToBytes(hex: string): number[] {
-    if (!hex || hex === '0x') return [];
-    const cleanHex = hex.startsWith('0x') ? hex.slice(2) : hex;
-    // Pad if odd length
-    const paddedHex = cleanHex.length % 2 === 0 ? cleanHex : '0' + cleanHex;
-    const bytes: number[] = [];
-    for (let i = 0; i < paddedHex.length; i += 2) {
-        bytes.push(parseInt(paddedHex.substr(i, 2), 16));
-    }
-    return bytes;
 }
 
 /**

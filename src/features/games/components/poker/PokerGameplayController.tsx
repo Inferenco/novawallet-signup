@@ -35,6 +35,7 @@ import {
   fetchHandResultForHand,
   fetchHoleCardsRevealedEvents
 } from "../../services/poker/indexer";
+import { getLastHandResult } from "../../services/poker/views";
 import { getProfiles, type UserProfile } from "../../services/profiles";
 import { deriveThemeFromColor } from "../../utils/theme";
 import { useChatContext } from "../../context/chat";
@@ -61,8 +62,6 @@ import "../../styles/poker-gameplay-desktop.css";
 const NORMAL_POLL = 3000;
 const URGENT_POLL = 1000;
 const BACKGROUND_POLL = 10000;
-const SHOWDOWN_FOREGROUND_RETRY_DELAYS = [250, 500, 750, 1000, 1500, 2000];
-const SHOWDOWN_BACKGROUND_RETRY_DELAY = 5000;
 
 const DISPLAY_POSITIONS = ["bottom", "left", "top-left", "top-right", "right"] as const;
 
@@ -531,7 +530,6 @@ export function PokerGameplayController({ tableAddress }: PokerGameplayControlle
       setShowdownRevealedCards([]);
     }, 0);
     let cancelled = false;
-    let retryTimeout: number | null = null;
 
     void fetchHoleCardsRevealedEvents(network, tableAddress, targetHand)
       .then((revealedEvents) => {
@@ -551,71 +549,40 @@ export function PokerGameplayController({ tableAddress }: PokerGameplayControlle
         // reveal events are supplemental; ignore failure
       });
 
-    const scheduleForegroundRetry = (attemptIndex: number) => {
-      if (attemptIndex >= SHOWDOWN_FOREGROUND_RETRY_DELAYS.length) {
-        retryTimeout = window.setTimeout(() => {
-          pollForResult("background");
-        }, SHOWDOWN_BACKGROUND_RETRY_DELAY);
-        return;
-      }
+    void getLastHandResult(network, tableAddress)
+      .then(async (result) => {
+        if (cancelled || latestHandRef.current > targetHand) {
+          return;
+        }
 
-      retryTimeout = window.setTimeout(() => {
-        pollForResult("foreground", attemptIndex);
-      }, SHOWDOWN_FOREGROUND_RETRY_DELAYS[attemptIndex]);
-    };
+        if (result.exists && result.handNumber === targetHand) {
+          applyHandResultToShowdown(result);
+          return;
+        }
 
-    const pollForResult = (
-      mode: "foreground" | "background",
-      foregroundAttemptIndex: number = 0
-    ) => {
-      if (cancelled || latestHandRef.current > targetHand) {
-        return;
-      }
+        const event = await fetchHandResultForHand(network, tableAddress, targetHand);
+        if (cancelled || latestHandRef.current > targetHand || !event) {
+          return;
+        }
 
-      void fetchHandResultForHand(network, tableAddress, targetHand)
-        .then((event) => {
-          if (cancelled || latestHandRef.current > targetHand) {
-            return;
-          }
+        applyHandResultToShowdown(event);
+      })
+      .catch(async () => {
+        if (cancelled || latestHandRef.current > targetHand) {
+          return;
+        }
 
-          if (event) {
-            applyHandResultToShowdown(event);
-            return;
-          }
+        const event = await fetchHandResultForHand(network, tableAddress, targetHand);
+        if (cancelled || latestHandRef.current > targetHand || !event) {
+          return;
+        }
 
-          if (mode === "foreground") {
-            scheduleForegroundRetry(foregroundAttemptIndex + 1);
-            return;
-          }
-
-          retryTimeout = window.setTimeout(() => {
-            pollForResult("background");
-          }, SHOWDOWN_BACKGROUND_RETRY_DELAY);
-        })
-        .catch(() => {
-          if (cancelled || latestHandRef.current > targetHand) {
-            return;
-          }
-
-          if (mode === "foreground") {
-            scheduleForegroundRetry(foregroundAttemptIndex + 1);
-            return;
-          }
-
-          retryTimeout = window.setTimeout(() => {
-            pollForResult("background");
-          }, SHOWDOWN_BACKGROUND_RETRY_DELAY);
-        });
-    };
-
-    pollForResult("foreground", 0);
+        applyHandResultToShowdown(event);
+      });
 
     return () => {
       cancelled = true;
       window.clearTimeout(resolvingId);
-      if (retryTimeout !== null) {
-        window.clearTimeout(retryTimeout);
-      }
     };
   }, [applyHandResultToShowdown, network, phase, tableAddress, tableState?.handNumber]);
 

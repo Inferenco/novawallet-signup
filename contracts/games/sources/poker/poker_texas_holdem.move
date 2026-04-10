@@ -129,6 +129,26 @@ module NovaWalletGames::poker_texas_holdem {
         is_sitting_out: bool,
     }
 
+    struct LastHandResult has store, copy, drop {
+        hand_number: u64,
+        result_type: u8,
+        timestamp: u64,
+        community_cards: vector<u8>,
+        showdown_seats: vector<u64>,
+        showdown_players: vector<address>,
+        showdown_hole_cards: vector<vector<u8>>,
+        showdown_hand_types: vector<u8>,
+        winner_seats: vector<u64>,
+        winner_players: vector<address>,
+        winner_amounts: vector<u64>,
+        total_pot: u64,
+        total_fees: u64,
+    }
+
+    struct LastHandResultStore has key {
+        result: LastHandResult,
+    }
+
     struct Game has store, drop {
         phase: u8,
         encrypted_hole_cards: vector<vector<u8>>,  // Encrypted with per-player keys
@@ -497,7 +517,7 @@ module NovaWalletGames::poker_texas_holdem {
     /// 
     /// Returns chips to any seated players and removes the Table resource.
     /// Cannot be called while a hand is in progress.
-    public entry fun close_table(owner: &signer, table_addr: address) acquires Table, TableRef {
+    public entry fun close_table(owner: &signer, table_addr: address) acquires Table, TableRef, LastHandResultStore {
         assert!(exists<Table>(table_addr), E_TABLE_NOT_FOUND);
         
         let owner_addr = signer::address_of(owner);
@@ -515,6 +535,10 @@ module NovaWalletGames::poker_texas_holdem {
         
         // Emit event BEFORE deletion so it can be indexed by frontend
         poker_events::emit_table_closed(table_addr, owner_addr);
+
+        if (exists<LastHandResultStore>(table_addr)) {
+            let LastHandResultStore { result: _ } = move_from<LastHandResultStore>(table_addr);
+        };
         
         // Move out and destroy the table
         let Table {
@@ -1171,7 +1195,7 @@ module NovaWalletGames::poker_texas_holdem {
     // PLAYER ACTIONS
     // ============================================
 
-    public entry fun fold(player: &signer, table_addr: address) acquires Table {
+    public entry fun fold(player: &signer, table_addr: address) acquires Table, LastHandResultStore {
         assert!(exists<Table>(table_addr), E_TABLE_NOT_FOUND);
         let table = borrow_global_mut<Table>(table_addr);
         assert!(option::is_some(&table.game), E_NO_GAME);
@@ -1192,7 +1216,7 @@ module NovaWalletGames::poker_texas_holdem {
         advance_action_internal(table, table_addr);
     }
 
-    public entry fun check(player: &signer, table_addr: address) acquires Table {
+    public entry fun check(player: &signer, table_addr: address) acquires Table, LastHandResultStore {
         assert!(exists<Table>(table_addr), E_TABLE_NOT_FOUND);
         let table = borrow_global_mut<Table>(table_addr);
         assert!(option::is_some(&table.game), E_NO_GAME);
@@ -1213,7 +1237,7 @@ module NovaWalletGames::poker_texas_holdem {
         advance_action_internal(table, table_addr);
     }
 
-    public entry fun call(player: &signer, table_addr: address) acquires Table {
+    public entry fun call(player: &signer, table_addr: address) acquires Table, LastHandResultStore {
         assert!(exists<Table>(table_addr), E_TABLE_NOT_FOUND);
         let table = borrow_global_mut<Table>(table_addr);
         assert!(option::is_some(&table.game), E_NO_GAME);
@@ -1243,7 +1267,7 @@ module NovaWalletGames::poker_texas_holdem {
         advance_action_internal(table, table_addr);
     }
 
-    public entry fun raise_to(player: &signer, table_addr: address, total_bet: u64) acquires Table {
+    public entry fun raise_to(player: &signer, table_addr: address, total_bet: u64) acquires Table, LastHandResultStore {
         assert!(exists<Table>(table_addr), E_TABLE_NOT_FOUND);
         let table = borrow_global_mut<Table>(table_addr);
         assert!(option::is_some(&table.game), E_NO_GAME);
@@ -1315,7 +1339,7 @@ module NovaWalletGames::poker_texas_holdem {
         advance_action_internal(table, table_addr);
     }
 
-    public entry fun all_in(player: &signer, table_addr: address) acquires Table {
+    public entry fun all_in(player: &signer, table_addr: address) acquires Table, LastHandResultStore {
         assert!(exists<Table>(table_addr), E_TABLE_NOT_FOUND);
         let table = borrow_global_mut<Table>(table_addr);
         assert!(option::is_some(&table.game), E_NO_GAME);
@@ -1425,7 +1449,7 @@ module NovaWalletGames::poker_texas_holdem {
     /// Anyone can call this to enforce timeouts. Effects depend on phase:
     /// - COMMIT/REVEAL: Apply 10% penalty, mark as sitting out, abort if <2 players remain
     /// - PREFLOP-RIVER: Auto-fold the timed-out player
-    public entry fun handle_timeout(table_addr: address) acquires Table {
+    public entry fun handle_timeout(table_addr: address) acquires Table, LastHandResultStore {
         assert!(exists<Table>(table_addr), E_TABLE_NOT_FOUND);
         let table = borrow_global_mut<Table>(table_addr);
         assert!(option::is_some(&table.game), E_NO_GAME);
@@ -1467,7 +1491,7 @@ module NovaWalletGames::poker_texas_holdem {
     // INTERNAL GAME LOGIC
     // ============================================
 
-    fun advance_action_internal(table: &mut Table, table_addr: address) {
+    fun advance_action_internal(table: &mut Table, table_addr: address) acquires LastHandResultStore {
         let game = option::borrow(&table.game);
         let active_count = count_active_players_internal(game);
         
@@ -1486,7 +1510,7 @@ module NovaWalletGames::poker_texas_holdem {
         };
     }
 
-    fun collect_and_advance_phase(table: &mut Table, table_addr: address) {
+    fun collect_and_advance_phase(table: &mut Table, table_addr: address) acquires LastHandResultStore {
         {
             let game_mut = option::borrow_mut(&mut table.game);
             let non_folded = get_non_folded_mask_internal(game_mut);
@@ -1495,7 +1519,7 @@ module NovaWalletGames::poker_texas_holdem {
         advance_phase_internal(table, table_addr);
     }
 
-    fun advance_phase_internal(table: &mut Table, table_addr: address) {
+    fun advance_phase_internal(table: &mut Table, table_addr: address) acquires LastHandResultStore {
         let bb = table.config.big_blind;
         let game_mut = option::borrow_mut(&mut table.game);
         game_mut.last_aggressor = option::none();
@@ -1587,7 +1611,7 @@ module NovaWalletGames::poker_texas_holdem {
         };
     }
 
-    fun run_showdown_internal(table: &mut Table, table_addr: address) {
+    fun run_showdown_internal(table: &mut Table, table_addr: address) acquires LastHandResultStore {
         let game = option::borrow(&table.game);
         let hand_rankings = vector::empty<poker_pot_manager::HandRanking>();
         let num_players = vector::length(&game.players_in_hand);
@@ -1647,6 +1671,7 @@ module NovaWalletGames::poker_texas_holdem {
         let community_cards = game.community_cards;
         let total_pot = poker_pot_manager::get_total_pot(&game.pot_state);
         let hand_number = table.hand_number;
+        let hand_timestamp = timestamp::now_seconds();
         
         // Process distributions and build winner data
         let winner_seats = vector::empty<u64>();
@@ -1678,12 +1703,11 @@ module NovaWalletGames::poker_texas_holdem {
             
             d = d + 1;
         };
-        
-        // Emit comprehensive hand result event
-        poker_events::emit_hand_result(
-            table_addr,
+
+        let last_result = LastHandResult {
             hand_number,
-            timestamp::now_seconds(),
+            result_type: 0,
+            timestamp: hand_timestamp,
             community_cards,
             showdown_seats,
             showdown_players,
@@ -1693,8 +1717,26 @@ module NovaWalletGames::poker_texas_holdem {
             winner_players,
             winner_amounts,
             total_pot,
-            0,
-            0, // result_type: showdown
+            total_fees: 0,
+        };
+        store_last_hand_result(table, last_result);
+
+        // Emit comprehensive hand result event
+        poker_events::emit_hand_result(
+            table_addr,
+            last_result.hand_number,
+            last_result.timestamp,
+            last_result.community_cards,
+            last_result.showdown_seats,
+            last_result.showdown_players,
+            last_result.showdown_hole_cards,
+            last_result.showdown_hand_types,
+            last_result.winner_seats,
+            last_result.winner_players,
+            last_result.winner_amounts,
+            last_result.total_pot,
+            last_result.total_fees,
+            last_result.result_type,
         );
 
         // Dead money has now been consumed into this completed hand's pot.
@@ -1706,7 +1748,7 @@ module NovaWalletGames::poker_texas_holdem {
         table.game = option::none();
     }
 
-    fun end_hand_fold_internal(table: &mut Table, table_addr: address) {
+    fun end_hand_fold_internal(table: &mut Table, table_addr: address) acquires LastHandResultStore {
         {
             let game_mut = option::borrow_mut(&mut table.game);
             let non_folded = get_non_folded_mask_internal(game_mut);
@@ -1730,6 +1772,7 @@ module NovaWalletGames::poker_texas_holdem {
         let community_cards = game.community_cards;
         let seat_idx = *vector::borrow(&game.players_in_hand, winner_hand_idx);
         let hand_number = table.hand_number;
+        let hand_timestamp = timestamp::now_seconds();
         
         let seat = option::borrow_mut(vector::borrow_mut(&mut table.seats, seat_idx));
         seat.chip_count = seat.chip_count + total;
@@ -1738,24 +1781,40 @@ module NovaWalletGames::poker_texas_holdem {
         // Record win (hand_rank 255 for fold-win)
         poker_player_stats::record_win(winner_player, total, 255);
         
-        
+        let last_result = LastHandResult {
+            hand_number,
+            result_type: 1,
+            timestamp: hand_timestamp,
+            community_cards,
+            showdown_seats: vector::empty<u64>(),
+            showdown_players: vector::empty<address>(),
+            showdown_hole_cards: vector::empty<vector<u8>>(),
+            showdown_hand_types: vector::empty<u8>(),
+            winner_seats: vector::singleton(seat_idx),
+            winner_players: vector::singleton(winner_player),
+            winner_amounts: vector::singleton(total),
+            total_pot: total,
+            total_fees: 0,
+        };
+        store_last_hand_result(table, last_result);
+
         // Emit hand result event for fold win
         // For fold wins, showdown arrays are empty (cards not revealed)
         poker_events::emit_hand_result(
             table_addr,
-            hand_number,
-            timestamp::now_seconds(),
-            community_cards,
-            vector::empty<u64>(),           // showdown_seats (empty - no showdown)
-            vector::empty<address>(),       // showdown_players
-            vector::empty<vector<u8>>(),    // showdown_hole_cards
-            vector::empty<u8>(),            // showdown_hand_types
-            vector::singleton(seat_idx),    // winner_seats
-            vector::singleton(winner_player), // winner_players
-            vector::singleton(total),       // winner_amounts
-            total,
-            0,
-            1, // result_type: fold_win
+            last_result.hand_number,
+            last_result.timestamp,
+            last_result.community_cards,
+            last_result.showdown_seats,
+            last_result.showdown_players,
+            last_result.showdown_hole_cards,
+            last_result.showdown_hand_types,
+            last_result.winner_seats,
+            last_result.winner_players,
+            last_result.winner_amounts,
+            last_result.total_pot,
+            last_result.total_fees,
+            last_result.result_type,
         );
 
         // Dead money has now been consumed into this completed hand's pot.
@@ -1765,6 +1824,17 @@ module NovaWalletGames::poker_texas_holdem {
         process_pending_leaves(table, table_addr);
         
         table.game = option::none();
+    }
+
+    fun store_last_hand_result(table: &Table, result: LastHandResult) acquires LastHandResultStore {
+        let table_addr = object::address_from_extend_ref(&table.extend_ref);
+        if (exists<LastHandResultStore>(table_addr)) {
+            let store = borrow_global_mut<LastHandResultStore>(table_addr);
+            store.result = result;
+        } else {
+            let table_signer = object::generate_signer_for_extending(&table.extend_ref);
+            move_to(&table_signer, LastHandResultStore { result });
+        };
     }
 
     /// Process pending leaves - auto-remove players who requested to leave after hand
@@ -2302,6 +2372,64 @@ module NovaWalletGames::poker_texas_holdem {
     public fun get_table_state(table_addr: address): (u64, u64, u64, u64) acquires Table {
         let table = borrow_global<Table>(table_addr);
         (table.hand_number, table.dealer_button, table.next_bb_seat, 0)
+    }
+
+    #[view]
+    /// Get the latest completed hand result stored on the table.
+    public fun get_last_hand_result(table_addr: address): (
+        bool,
+        u64,
+        u8,
+        u64,
+        vector<u8>,
+        vector<u64>,
+        vector<address>,
+        vector<vector<u8>>,
+        vector<u8>,
+        vector<u64>,
+        vector<address>,
+        vector<u64>,
+        u64,
+        u64
+    ) acquires Table, LastHandResultStore {
+        assert!(exists<Table>(table_addr), E_TABLE_NOT_FOUND);
+        let table = borrow_global<Table>(table_addr);
+        if (!exists<LastHandResultStore>(table_addr)) {
+            return (
+                false,
+                0,
+                0,
+                0,
+                vector::empty<u8>(),
+                vector::empty<u64>(),
+                vector::empty<address>(),
+                vector::empty<vector<u8>>(),
+                vector::empty<u8>(),
+                vector::empty<u64>(),
+                vector::empty<address>(),
+                vector::empty<u64>(),
+                0,
+                0
+            )
+        };
+
+        let result = &borrow_global<LastHandResultStore>(table_addr).result;
+        (
+            true,
+            result.hand_number,
+            result.result_type,
+            result.timestamp,
+            result.community_cards,
+            result.showdown_seats,
+            result.showdown_players,
+            result.showdown_hole_cards,
+            result.showdown_hand_types,
+            result.winner_seats,
+            result.winner_players,
+            result.winner_amounts,
+            result.total_pot,
+            result.total_fees
+        )
     }
 
     #[view]

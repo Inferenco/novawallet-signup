@@ -71,3 +71,20 @@ export interface AbortStatus {
     deadline: number;
     seatedCount: number;
 }
+
+export interface LastHandResult {
+    exists: boolean;
+    handNumber: number;
+    resultType: number;
+    timestamp: number;
+    communityCards: number[];
+    showdownSeats: number[];
+    showdownPlayers: string[];
+    showdownHoleCards: number[][];
+    showdownHandTypes: number[];
+    winnerSeats: number[];
+    winnerPlayers: string[];
+    winnerAmounts: number[];
+    totalPot: number;
+    totalFees: number;
+}
