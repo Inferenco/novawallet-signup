@@ -15,6 +15,9 @@
   --poker-mobile-input-h: 34px;
   --poker-mobile-gap: 5px;
   --poker-mobile-radius: 16px;
+  --poker-mobile-top-seat-edge: 14%;
+  --poker-mobile-top-seat-pill-max: 62px;
+  --poker-mobile-top-seat-bet-offset: -28px;
   height: 100dvh;
   padding:
     max(6px, env(safe-area-inset-top))
@@ -59,12 +62,12 @@
 
 .poker-gameplay-stage-mobile .poker-gameplay-seat-top-left {
   top: 14px;
-  left: 17%;
+  left: var(--poker-mobile-top-seat-edge);
 }
 
 .poker-gameplay-stage-mobile .poker-gameplay-seat-top-right {
   top: 14px;
-  right: 17%;
+  right: var(--poker-mobile-top-seat-edge);
 }
 
 .poker-gameplay-stage-mobile .poker-gameplay-seat-left {
@@ -95,7 +98,8 @@
 .poker-gameplay-stage-mobile .poker-gameplay-seat-top-left .poker-gameplay-seat-bet,
 .poker-gameplay-stage-mobile .poker-gameplay-seat-top-right .poker-gameplay-seat-bet {
   top: auto;
-  bottom: -8px;
+  bottom: var(--poker-mobile-top-seat-bet-offset);
+  max-width: var(--poker-mobile-top-seat-pill-max);
 }
 
 .poker-gameplay-stage-mobile .poker-gameplay-seat-bottom .poker-gameplay-seat-bet {
@@ -418,6 +422,12 @@
   padding-inline: 5px;
 }
 
+.poker-gameplay-shell-mobile.w360 {
+  --poker-mobile-top-seat-edge: 10%;
+  --poker-mobile-top-seat-pill-max: 58px;
+  --poker-mobile-top-seat-bet-offset: -24px;
+}
+
 .poker-gameplay-shell-mobile.w360 .poker-gameplay-card {
   width: 28px;
   border-radius: 8px;
@@ -486,6 +496,9 @@
   --poker-mobile-secondary-btn-h: 28px;
   --poker-mobile-input-h: 32px;
   --poker-mobile-dock-pad: 6px;
+  --poker-mobile-top-seat-edge: 11%;
+  --poker-mobile-top-seat-pill-max: 58px;
+  --poker-mobile-top-seat-bet-offset: -22px;
 }
 
 .poker-gameplay-shell-mobile.w390 .poker-gameplay-dock-mobile {
@@ -545,12 +558,12 @@
 
 .poker-gameplay-shell-mobile.w390 .poker-gameplay-seat-top-left {
   top: 12px;
-  left: 15%;
+  left: var(--poker-mobile-top-seat-edge);
 }
 
 .poker-gameplay-shell-mobile.w390 .poker-gameplay-seat-top-right {
   top: 12px;
-  right: 15%;
+  right: var(--poker-mobile-top-seat-edge);
 }
 
 .poker-gameplay-shell-mobile.w390 .poker-gameplay-seat-bottom {

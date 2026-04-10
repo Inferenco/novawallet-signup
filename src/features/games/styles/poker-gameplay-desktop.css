@@ -5,6 +5,8 @@
   place-items: center;
   --poker-desktop-seat-box-w: 92px;
   --poker-desktop-seat-box-h: 118px;
+  --poker-desktop-top-seat-edge: 18%;
+  --poker-desktop-top-seat-bet-offset: -34px;
 }
 
 .poker-gameplay-desktop-stage {
@@ -29,12 +31,12 @@
 
 .poker-gameplay-stage-desktop .poker-gameplay-seat-top-left {
   top: 28px;
-  left: 24%;
+  left: var(--poker-desktop-top-seat-edge);
 }
 
 .poker-gameplay-stage-desktop .poker-gameplay-seat-top-right {
   top: 28px;
-  right: 24%;
+  right: var(--poker-desktop-top-seat-edge);
 }
 
 .poker-gameplay-stage-desktop .poker-gameplay-seat-left {
@@ -65,7 +67,7 @@
 .poker-gameplay-stage-desktop .poker-gameplay-seat-top-left .poker-gameplay-seat-bet,
 .poker-gameplay-stage-desktop .poker-gameplay-seat-top-right .poker-gameplay-seat-bet {
   top: auto;
-  bottom: -10px;
+  bottom: var(--poker-desktop-top-seat-bet-offset);
 }
 
 .poker-gameplay-stage-desktop .poker-gameplay-seat-bottom .poker-gameplay-seat-bet {
@@ -162,6 +164,8 @@
     padding: 16px;
     --poker-desktop-seat-box-w: 86px;
     --poker-desktop-seat-box-h: 110px;
+    --poker-desktop-top-seat-edge: 16%;
+    --poker-desktop-top-seat-bet-offset: -30px;
   }
 
   .poker-gameplay-stage-desktop .poker-gameplay-stage-surface {
