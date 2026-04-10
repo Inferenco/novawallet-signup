@@ -49,6 +49,7 @@ function TableAvatar({
 }
 
 export function PokerLandingPage() {
+  const CHIP_CACHE_FRESH_MS = 5 * 60 * 1000;
   const wallet = useWallet();
   const network = useGamesNetwork();
   const navigate = useNavigate();
@@ -64,9 +65,23 @@ export function PokerLandingPage() {
   const cachedChipEntry = usePokerChipsStore((state) =>
     chipBalanceKey ? state.balances[chipBalanceKey] ?? null : null
   );
+  const [cacheCheckTime, setCacheCheckTime] = useState(0);
+
+  useEffect(() => {
+    const updateNow = () => setCacheCheckTime(Date.now());
+
+    const timeoutId = window.setTimeout(updateNow, 0);
+    const intervalId = window.setInterval(updateNow, 60_000);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      window.clearInterval(intervalId);
+    };
+  }, []);
+
   const cachedChipBalance = cachedChipEntry?.balance ?? 0;
   const isCachedBalanceFresh = cachedChipEntry
-    ? Date.now() - cachedChipEntry.updatedAt < 5 * 60 * 1000
+    ? cacheCheckTime - cachedChipEntry.updatedAt < CHIP_CACHE_FRESH_MS
     : false;
   const effectiveChipBalance =
     chipActions.chipBalance > 0
