@@ -36,6 +36,7 @@ export interface HandResultEvent {
     tableAddress: string;
     handNumber: number;
     timestamp: number;
+    transactionVersion: number;
     resultType: number; // 0 = showdown, 1 = fold_win
     // Winner info
     winnerSeats: number[];
@@ -51,6 +52,16 @@ export interface HandResultEvent {
     totalPot: number;
 }
 
+export interface HoleCardsRevealedEvent {
+    tableAddress: string;
+    handNumber: number;
+    timestamp: number;
+    transactionVersion: number;
+    seatIdx: number;
+    player: string;
+    holeCards: number[];
+}
+
 export interface DiscoveredTable extends TableSummary {
     tableAddress: string;
 }
@@ -60,45 +71,113 @@ export interface DiscoveredTable extends TableSummary {
 // ============================================================================
 
 const GRAPHQL_ENDPOINT = CHAIN_CONFIG.gamesIndexerUrl;
-const STALE_TABLE_TTL_MS = 60_000;
-const staleTableAddresses = new Map<string, number>();
 
 interface GraphQLResponse<T> {
     data?: T;
     errors?: Array<{ message: string }>;
 }
 
+interface IndexerQueryOptions {
+    timeoutMs?: number;
+}
+
+const HAND_RESULT_TIMEOUT_MS = 3000;
+const HOLE_CARDS_REVEALED_TIMEOUT_MS = 2000;
+
+function safeArray(val: any): any[] {
+    if (Array.isArray(val)) return val;
+    if (typeof val === 'string') {
+        try {
+            const parsed = JSON.parse(val);
+            if (Array.isArray(parsed)) return parsed;
+        } catch { }
+    }
+    return [];
+}
+
+function hexStringToBytes(hex: string): number[] {
+    if (!hex || hex === '0x') return [];
+    const cleanHex = hex.startsWith('0x') ? hex.slice(2) : hex;
+    const paddedHex = cleanHex.length % 2 === 0 ? cleanHex : `0${cleanHex}`;
+    const bytes: number[] = [];
+    for (let i = 0; i < paddedHex.length; i += 2) {
+        bytes.push(parseInt(paddedHex.substr(i, 2), 16));
+    }
+    return bytes;
+}
+
+function parseCards(val: any): number[] {
+    if (Array.isArray(val)) return val.map(Number);
+    if (typeof val === 'string') {
+        if (val.startsWith('0x')) return hexStringToBytes(val);
+        try {
+            const parsed = JSON.parse(val);
+            if (Array.isArray(parsed)) return parsed.map(Number);
+        } catch { }
+    }
+    return [];
+}
+
 async function queryIndexer<T>(
     network: NetworkType,
     query: string,
-    variables: Record<string, unknown> = {}
-): Promise<T | null> {
+    variables: Record<string, unknown> = {},
+    options: IndexerQueryOptions = {}
+): Promise<T> {
     // For now, we only support Cedra testnet indexer
     if (network !== 'testnet') {
-        console.warn('Indexer only available on testnet');
-        return null;
+        throw new Error('Indexer only available on testnet');
     }
 
     try {
-        const response = await fetch(GRAPHQL_ENDPOINT, {
+        const response = await fetchWithTimeout(GRAPHQL_ENDPOINT, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({ query, variables }),
-        });
+        }, options.timeoutMs);
+
+        if (!response.ok) {
+            throw new Error(`Indexer request failed with status ${response.status}`);
+        }
 
         const result: GraphQLResponse<T> = await response.json();
 
-        if (result.errors) {
-            console.error('[Indexer] GraphQL errors:', result.errors);
-            return null;
+        if (result.errors?.length) {
+            throw new Error(result.errors.map((error) => error.message).join('; '));
         }
 
-        return result.data ?? null;
+        if (result.data === undefined) {
+            throw new Error('Indexer response did not include data');
+        }
+
+        return result.data;
     } catch (error) {
         console.error('[Indexer] Query failed:', error);
-        return null;
+        throw error;
+    }
+}
+
+async function fetchWithTimeout(
+    input: RequestInfo | URL,
+    init: RequestInit = {},
+    timeoutMs?: number,
+): Promise<Response> {
+    if (!timeoutMs || timeoutMs <= 0) {
+        return fetch(input, init);
+    }
+
+    const controller = new AbortController();
+    const timeoutId = globalThis.setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+        return await fetch(input, {
+            ...init,
+            signal: controller.signal,
+        });
+    } finally {
+        globalThis.clearTimeout(timeoutId);
     }
 }
 
@@ -114,26 +193,6 @@ function getEventTypeVariants(contractAddress: string, eventName: string): strin
         `${normalized}::poker_events::${eventName}`,
         `${padded}::poker_events::${eventName}`,
     ])];
-}
-
-function pruneStaleTableCache(now = Date.now()) {
-    staleTableAddresses.forEach((timestamp, address) => {
-        if (now - timestamp > STALE_TABLE_TTL_MS) {
-            staleTableAddresses.delete(address);
-        }
-    });
-}
-
-function isMissingTableError(error: unknown): boolean {
-    const message = error instanceof Error ? error.message : String(error ?? '');
-    return (
-        message.includes('get_table_summary') &&
-        (
-            message.includes('MISSING_DATA') ||
-            message.includes('ABORTED') ||
-            message.includes('sub_status: Some(3)')
-        )
-    );
 }
 
 // ============================================================================
@@ -168,7 +227,7 @@ export async function fetchTableCreatedEvents(
         events: Array<{ type: string; data: any; transaction_version: string }>;
     }>(network, query, { eventTypes, limit });
 
-    if (!result?.events) return [];
+    if (!result.events) return [];
 
     return result.events.map(e => ({
         tableAddress: normalizeAddress(e.data.table_addr || e.data.table_address || e.data.tableAddress || ''),
@@ -206,7 +265,7 @@ export async function fetchTableClosedEvents(
         events: Array<{ type: string; data: any; transaction_version: string }>;
     }>(network, query, { eventTypes, limit });
 
-    if (!result?.events) return [];
+    if (!result.events) return [];
 
     return result.events.map(e => ({
         tableAddress: normalizeAddress(e.data.table_addr || e.data.table_address || e.data.tableAddress || ''),
@@ -221,6 +280,15 @@ export async function fetchHandResults(
     network: NetworkType,
     tableAddress: string,
     limit: number = 20
+): Promise<HandResultEvent[]> {
+    return fetchHandResultsInternal(network, tableAddress, limit);
+}
+
+async function fetchHandResultsInternal(
+    network: NetworkType,
+    tableAddress: string,
+    limit: number,
+    options: IndexerQueryOptions = {}
 ): Promise<HandResultEvent[]> {
     const contract = getGameContract(network);
     const eventTypes = getEventTypeVariants(contract.address, 'HandResult');
@@ -242,46 +310,9 @@ export async function fetchHandResults(
 
     const result = await queryIndexer<{
         events: Array<{ type: string; data: any; transaction_version: string }>;
-    }>(network, query, { eventTypes, limit });
+    }>(network, query, { eventTypes, limit }, options);
 
-    if (!result?.events) return [];
-
-    // Helper to safely get array from data
-    const safeArray = (val: any): any[] => {
-        if (Array.isArray(val)) return val;
-        if (typeof val === 'string') {
-            try {
-                const parsed = JSON.parse(val);
-                if (Array.isArray(parsed)) return parsed;
-            } catch { }
-        }
-        return [];
-    };
-
-    // Helper to decode hex string to bytes
-    const hexStringToBytes = (hex: string): number[] => {
-        if (!hex || hex === '0x') return [];
-        const cleanHex = hex.startsWith('0x') ? hex.slice(2) : hex;
-        const paddedHex = cleanHex.length % 2 === 0 ? cleanHex : '0' + cleanHex;
-        const bytes: number[] = [];
-        for (let i = 0; i < paddedHex.length; i += 2) {
-            bytes.push(parseInt(paddedHex.substr(i, 2), 16));
-        }
-        return bytes;
-    };
-
-    // Helper to parse card data (can be array, JSON array, or hex string)
-    const parseCards = (val: any): number[] => {
-        if (Array.isArray(val)) return val.map(Number);
-        if (typeof val === 'string') {
-            if (val.startsWith('0x')) return hexStringToBytes(val);
-            try {
-                const parsed = JSON.parse(val);
-                if (Array.isArray(parsed)) return parsed.map(Number);
-            } catch { }
-        }
-        return [];
-    };
+    if (!result.events) return [];
 
     // Filter by table address
     return result.events
@@ -308,8 +339,103 @@ export async function fetchHandResults(
                 // Board
                 communityCards: parseCards(data.community_cards),
                 totalPot: Number(data.total_pot || 0),
+                transactionVersion: Number(e.transaction_version || 0),
             };
+        })
+        .sort((a, b) => {
+            if (b.handNumber !== a.handNumber) {
+                return b.handNumber - a.handNumber;
+            }
+            if (b.transactionVersion !== a.transactionVersion) {
+                return b.transactionVersion - a.transactionVersion;
+            }
+            return b.timestamp - a.timestamp;
         });
+}
+
+export async function fetchHandResultForHand(
+    network: NetworkType,
+    tableAddress: string,
+    handNumber: number
+): Promise<HandResultEvent | null> {
+    try {
+        const events = await fetchHandResultsInternal(network, tableAddress, 50, {
+            timeoutMs: HAND_RESULT_TIMEOUT_MS
+        });
+        return events.find((event) => event.handNumber === handNumber) ?? null;
+    } catch (error) {
+        console.error('[Indexer] Failed to fetch hand result for hand', handNumber, error);
+        return null;
+    }
+}
+
+export async function fetchHoleCardsRevealedEvents(
+    network: NetworkType,
+    tableAddress: string,
+    handNumber?: number,
+    limit: number = 50
+): Promise<HoleCardsRevealedEvent[]> {
+    const contract = getGameContract(network);
+    const eventTypes = getEventTypeVariants(contract.address, 'HoleCardsRevealed');
+    const normalizedTable = normalizeAddress(tableAddress);
+
+    const query = `
+        query FetchHoleCardsRevealed($eventTypes: [String!], $limit: Int) {
+            events(
+                where: { type: { _in: $eventTypes } }
+                order_by: { transaction_version: desc }
+                limit: $limit
+            ) {
+                type
+                data
+                transaction_version
+            }
+        }
+    `;
+
+    try {
+        const result = await queryIndexer<{
+            events: Array<{ type: string; data: any; transaction_version: string }>;
+        }>(network, query, { eventTypes, limit }, { timeoutMs: HOLE_CARDS_REVEALED_TIMEOUT_MS });
+
+        if (!result.events) return [];
+
+        return result.events
+            .filter((event) => {
+                const data = event.data;
+                const eventTable = normalizeAddress(data.table_addr || data.table_address || data.tableAddress || '');
+                if (eventTable !== normalizedTable) return false;
+                if (handNumber === undefined) return true;
+                return Number(data.hand_number || 0) === handNumber;
+            })
+            .flatMap((event) => {
+                try {
+                    const data = event.data;
+                    return [{
+                        tableAddress: normalizedTable,
+                        handNumber: Number(data.hand_number || data.handNumber || 0),
+                        timestamp: Number(data.timestamp || 0),
+                        seatIdx: Number(data.seat_idx || data.seat_index || data.seatIdx || 0),
+                        player: normalizeAddress(data.player || data.player_addr || data.playerAddress || ''),
+                        holeCards: parseCards(data.hole_cards || data.holeCards),
+                        transactionVersion: Number(event.transaction_version || 0),
+                    }];
+                } catch (error) {
+                    console.error('[Indexer] Skipping malformed HoleCardsRevealed event:', error);
+                    return [];
+                }
+            })
+            .sort((a, b) => {
+                if (b.handNumber !== a.handNumber) return b.handNumber - a.handNumber;
+                if (b.transactionVersion !== a.transactionVersion) {
+                    return b.transactionVersion - a.transactionVersion;
+                }
+                return b.timestamp - a.timestamp;
+            });
+    } catch (error) {
+        console.error('[Indexer] Failed to fetch HoleCardsRevealed events:', error);
+        return [];
+    }
 }
 
 // ============================================================================
@@ -323,44 +449,33 @@ export async function discoverActiveTables(
     network: NetworkType,
     limit: number = 20
 ): Promise<DiscoveredTable[]> {
-    pruneStaleTableCache();
-
-    // Fetch created and closed events (fetch more to account for filtering)
+    const discoveryLimit = Math.max(limit * 3, 30);
     const [created, closed] = await Promise.all([
-        fetchTableCreatedEvents(network, limit * 3),
-        fetchTableClosedEvents(network, limit * 3),
+        fetchTableCreatedEvents(network, discoveryLimit),
+        fetchTableClosedEvents(network, discoveryLimit),
     ]);
 
-    // Build set of closed table addresses
-    const closedSet = new Set(closed.map(e => e.tableAddress));
-
-    // Filter to active tables (created but not closed)
+    const closedSet = new Set(closed.map((event) => event.tableAddress));
     const activeAddresses = created
-        .filter(e => !closedSet.has(e.tableAddress))
-        .filter(e => !staleTableAddresses.has(e.tableAddress))
-        .map(e => e.tableAddress);
+        .filter((event) => !closedSet.has(event.tableAddress))
+        .map((event) => event.tableAddress);
 
     // Deduplicate
     const uniqueAddresses = [...new Set(activeAddresses)];
 
-    // Fetch summaries for each active table (up to limit)
-    // Fetch summaries for each active table (up to limit) in parallel
     const targetAddresses = uniqueAddresses.slice(0, limit);
 
     const summaryPromises = targetAddresses.map(async (address) => {
         try {
             const summary = await getTableSummary(network, address);
+            if (summary.isPaused || summary.ownerOnlyStart) {
+                return null;
+            }
             return {
                 ...summary,
                 tableAddress: address,
             };
         } catch (error) {
-            // The indexer can lag behind closures; avoid hammering known-missing tables.
-            if (isMissingTableError(error)) {
-                staleTableAddresses.set(address, Date.now());
-                return null;
-            }
-
             console.warn(`Failed to fetch summary for ${address}:`, error);
             return null;
         }

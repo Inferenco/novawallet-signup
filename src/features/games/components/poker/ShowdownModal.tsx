@@ -1,7 +1,7 @@
 import { HAND_RANKS } from "../../config/games";
 import { type UserProfile } from "../../services/profiles";
 import { formatChips } from "../../services/poker/chips";
-import { formatCard } from "../../utils/poker/cards";
+import { PokerPlayingCard } from "./PokerPlayingCard";
 import "../../styles/poker-modals.css";
 
 interface WinnerSummary {
@@ -21,12 +21,14 @@ interface ShowdownPlayerSummary {
 
 interface ShowdownModalProps {
   visible: boolean;
+  status?: "idle" | "resolving" | "ready";
   handNumber: number;
   resultType: "showdown" | "fold_win";
   totalPot: number;
   communityCards: number[];
   winners: WinnerSummary[];
   showdownPlayers: ShowdownPlayerSummary[];
+  revealedCards?: Array<{ seatIdx: number; player: string; holeCards: number[] }>;
   playerProfiles: Map<string, UserProfile | null>;
   onClose: () => void;
 }
@@ -40,25 +42,29 @@ function displayName(
 
 export function ShowdownModal({
   visible,
+  status = "ready",
   handNumber,
   resultType,
   totalPot,
   communityCards,
   winners,
   showdownPlayers,
+  revealedCards = [],
   playerProfiles,
   onClose
 }: ShowdownModalProps) {
   if (!visible) return null;
 
   return (
-    <div className="games-overlay" role="dialog" aria-modal="true">
-      <div className="games-modal-panel">
+    <div className="games-overlay games-showdown-overlay" role="dialog" aria-modal="true">
+      <div className="games-modal-panel games-showdown-panel">
         <div className="games-modal-header">
           <div>
-            <h3 className="games-modal-title">Hand #{handNumber}</h3>
+            <h3 className="games-modal-title">
+              {resultType === "fold_win" ? "Winner" : "Showdown"}
+            </h3>
             <p className="games-status-text">
-              {resultType === "fold_win" ? "Won by fold" : "Showdown complete"} • Pot{" "}
+              Hand #{handNumber} • {resultType === "fold_win" ? "Won by fold" : "Showdown complete"} • Pot{" "}
               {formatChips(totalPot)}
             </p>
           </div>
@@ -67,13 +73,32 @@ export function ShowdownModal({
           </button>
         </div>
 
-        <div className="games-board-row">
-          {communityCards.map((card, index) => (
-            <span key={`${card}-${index}`} className="games-showdown-card">
-              {formatCard(card)}
-            </span>
-          ))}
+        <div className="games-showdown-summary">
+          <span className="games-field-label">
+            {resultType === "fold_win" ? "Final Pot Awarded" : "Final Pot"}
+          </span>
+          <strong>{formatChips(totalPot)}</strong>
         </div>
+
+        {status === "resolving" ? (
+          <p className="games-status-text games-showdown-status">Resolving final hand details…</p>
+        ) : null}
+
+        {resultType !== "fold_win" && communityCards.length > 0 ? (
+          <div className="games-section">
+            <p className="games-field-label">Board</p>
+            <div className="games-board-row">
+              {communityCards.map((card, index) => (
+                <PokerPlayingCard
+                  key={`${card}-${index}`}
+                  value={card}
+                  size="showdown"
+                  className="games-showdown-card"
+                />
+              ))}
+            </div>
+          </div>
+        ) : null}
 
         <div className="games-section">
           <p className="games-field-label">Winners</p>
@@ -85,7 +110,9 @@ export function ShowdownModal({
                 </p>
                 <p className="games-section-copy">
                   Seat {winner.seatIndex + 1}
-                  {winner.handType >= 0 ? ` • ${HAND_RANKS[winner.handType] || "Winning hand"}` : ""}
+                  {resultType !== "fold_win" && winner.handType >= 0
+                    ? ` • ${HAND_RANKS[winner.handType] || "Winning hand"}`
+                    : ""}
                 </p>
               </div>
               <strong>{formatChips(winner.amount)}</strong>
@@ -108,15 +135,48 @@ export function ShowdownModal({
                 </div>
                 <div className="games-board-row">
                   {player.holeCards.map((card, index) => (
-                    <span key={`${player.address}-${index}`} className="games-showdown-card small">
-                      {formatCard(card)}
-                    </span>
+                    <PokerPlayingCard
+                      key={`${player.address}-${index}`}
+                      value={card}
+                      size="mini"
+                      className="games-showdown-card small"
+                    />
                   ))}
                 </div>
               </div>
             ))}
           </div>
         ) : null}
+
+        {revealedCards.length > 0 ? (
+          <div className="games-section games-showdown-subsection">
+            <p className="games-field-label">Revealed Folded Hands</p>
+            {revealedCards.map((player) => (
+              <div key={`${player.player}-${player.seatIdx}`} className="games-showdown-row">
+                <div>
+                  <p className="games-section-title" style={{ fontSize: "1rem" }}>
+                    {displayName(playerProfiles, player.player)}
+                  </p>
+                  <p className="games-section-copy">Seat {player.seatIdx + 1} • Folded and revealed</p>
+                </div>
+                <div className="games-board-row">
+                  {player.holeCards.map((card, index) => (
+                    <PokerPlayingCard
+                      key={`${player.player}-${index}`}
+                      value={card}
+                      size="mini"
+                      className="games-showdown-card small"
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : null}
+
+        <button type="button" className="games-button games-button-primary" onClick={onClose}>
+          Continue
+        </button>
       </div>
     </div>
   );

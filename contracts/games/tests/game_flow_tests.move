@@ -35,6 +35,42 @@ module NovaWalletGames::game_flow_tests {
     }
 
     #[test(admin = @NovaWalletGames)]
+    fun test_get_last_hand_result_empty_on_new_table(admin: &signer) {
+        let table_addr = setup_table(admin);
+        let (
+            exists,
+            hand_number,
+            result_type,
+            timestamp,
+            community_cards,
+            showdown_seats,
+            showdown_players,
+            showdown_hole_cards,
+            showdown_hand_types,
+            winner_seats,
+            winner_players,
+            winner_amounts,
+            total_pot,
+            total_fees
+        ) = poker_texas_holdem::get_last_hand_result(table_addr);
+
+        assert!(!exists, 1);
+        assert!(hand_number == 0, 2);
+        assert!(result_type == 0, 3);
+        assert!(timestamp == 0, 4);
+        assert!(std::vector::length(&community_cards) == 0, 5);
+        assert!(std::vector::length(&showdown_seats) == 0, 6);
+        assert!(std::vector::length(&showdown_players) == 0, 7);
+        assert!(std::vector::length(&showdown_hole_cards) == 0, 8);
+        assert!(std::vector::length(&showdown_hand_types) == 0, 9);
+        assert!(std::vector::length(&winner_seats) == 0, 10);
+        assert!(std::vector::length(&winner_players) == 0, 11);
+        assert!(std::vector::length(&winner_amounts) == 0, 12);
+        assert!(total_pot == 0, 13);
+        assert!(total_fees == 0, 14);
+    }
+
+    #[test(admin = @NovaWalletGames)]
     #[expected_failure(abort_code = 2, location = NovaWalletGames::poker_texas_holdem)] // E_TABLE_EXISTS
     fun test_create_duplicate_table_fails(admin: &signer) {
         let _table_addr = setup_table(admin);
@@ -249,4 +285,3 @@ module NovaWalletGames::game_flow_tests {
         assert!(std::vector::length(&vec_wins) == 10, 9);
     }
 }
-

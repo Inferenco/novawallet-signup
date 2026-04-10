@@ -189,6 +189,23 @@ export const usePokerTableStore = create<ActiveTableState>((set, get) => ({
             // Also refresh game state if there's an active hand
             if (summary.hasActiveGame) {
                 await get().refreshGameState(playerAddress);
+            } else {
+                set({
+                    phase: GAME_PHASES.WAITING,
+                    playersInHand: [],
+                    actionInfo: null,
+                    potSize: 0,
+                    communityCards: [],
+                    minRaise: 0,
+                    commitStatus: [],
+                    revealStatus: [],
+                    commitDeadline: 0,
+                    revealDeadline: 0,
+                    myHandIndex: null,
+                    myHoleCards: [],
+                    myCardsDecrypted: false,
+                    abortStatus: null,
+                });
             }
         } catch (error: any) {
             const msg = error?.message || String(error);

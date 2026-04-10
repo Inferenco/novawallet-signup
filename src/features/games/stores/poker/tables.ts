@@ -62,6 +62,7 @@ export const usePokerTablesStore = create<PokerTablesState>((set, get) => ({
     ...initialState,
 
     refreshTables: async (network: NetworkType, limit = 20) => {
+        if (get().isLoading) return;
         set({ isLoading: true, error: null });
 
         try {
@@ -78,6 +79,7 @@ export const usePokerTablesStore = create<PokerTablesState>((set, get) => ({
             set({
                 isLoading: false,
                 error: 'Failed to load tables. Please try again.',
+                hasMore: false,
             });
         }
     },
@@ -107,6 +109,7 @@ export const usePokerTablesStore = create<PokerTablesState>((set, get) => ({
             set({
                 isLoadingMore: false,
                 error: 'Failed to load more tables.',
+                hasMore: false,
             });
         }
     },

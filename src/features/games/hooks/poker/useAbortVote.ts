@@ -58,10 +58,10 @@ export function useAbortVote({
     const vetoCount = abortStatus?.vetos || 0;
     const seatedCount = abortStatus?.seatedCount || 0;
 
-    // Unanimous approval needed (no vetos) AND either all voted or deadline passed
+    // Finalization is allowed after all votes or deadline, even if vetoed.
     const allVoted = approvalCount + vetoCount >= seatedCount;
     const deadlinePassed = abortDeadline > 0 && Math.floor(Date.now() / 1000) > abortDeadline;
-    const canFinalize = abortInProgress && vetoCount === 0 && (allVoted || deadlinePassed);
+    const canFinalize = abortInProgress && (allVoted || deadlinePassed);
 
     const request = useCallback(async (account: GameSigner): Promise<boolean> => {
         if (isPending) {

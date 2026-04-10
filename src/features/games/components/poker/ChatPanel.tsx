@@ -5,9 +5,10 @@ import "../../styles/poker-modals.css";
 interface ChatPanelProps {
   visible: boolean;
   onClose: () => void;
+  layoutMode?: "mobile" | "desktop";
 }
 
-export function ChatPanel({ visible, onClose }: ChatPanelProps) {
+export function ChatPanel({ visible, onClose, layoutMode = "mobile" }: ChatPanelProps) {
   const {
     messages,
     handle,
@@ -43,8 +44,12 @@ export function ChatPanel({ visible, onClose }: ChatPanelProps) {
   if (!visible) return null;
 
   return (
-    <div className="games-overlay games-chat-overlay" role="dialog" aria-modal="true">
-      <div className="games-modal-panel games-chat-panel">
+    <div
+      className={`games-overlay games-chat-overlay games-chat-overlay-${layoutMode}`}
+      role="dialog"
+      aria-modal="true"
+    >
+      <div className={`games-modal-panel games-chat-panel games-chat-panel-${layoutMode}`}>
         <div className="games-modal-header">
           <div>
             <h3 className="games-modal-title">Table Chat</h3>

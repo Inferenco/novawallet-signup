@@ -13,6 +13,7 @@ import {
     leaveAfterHand,
     cancelLeaveAfterHand,
     startHand,
+    revealHoleCards,
 } from '../../services/poker/actions';
 
 export type TableActionType =
@@ -23,7 +24,8 @@ export type TableActionType =
     | 'sitIn'
     | 'leaveAfterHand'
     | 'cancelLeaveAfterHand'
-    | 'startHand';
+    | 'startHand'
+    | 'revealHoleCards';
 
 interface UseTableActionsOptions {
     network: NetworkType;
@@ -46,6 +48,7 @@ interface UseTableActionsReturn {
     doLeaveAfterHand: (account: GameSigner) => Promise<boolean>;
     doCancelLeaveAfterHand: (account: GameSigner) => Promise<boolean>;
     doStartHand: (account: GameSigner) => Promise<boolean>;
+    doRevealHoleCards: (account: GameSigner) => Promise<boolean>;
 
     // Helpers
     clearError: () => void;
@@ -140,6 +143,10 @@ export function useTableActions({
         return executeAction('startHand', () => startHand(network, account, tableAddress));
     }, [network, tableAddress, executeAction]);
 
+    const doRevealHoleCards = useCallback(async (account: GameSigner): Promise<boolean> => {
+        return executeAction('revealHoleCards', () => revealHoleCards(network, account, tableAddress));
+    }, [network, tableAddress, executeAction]);
+
     const clearError = useCallback(() => {
         setError(null);
     }, []);
@@ -155,6 +162,7 @@ export function useTableActions({
         doLeaveAfterHand,
         doCancelLeaveAfterHand,
         doStartHand,
+        doRevealHoleCards,
         clearError,
     };
 }

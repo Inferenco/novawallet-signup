@@ -22,6 +22,7 @@ export type {
     TableSummary,
     TableConfig,
     TableState,
+    LastHandResult,
     SeatInfo,
     GameState,
     ActionInfo,

@@ -12,6 +12,11 @@ describe("parsePokerError", () => {
     expect(message.toLowerCase()).toContain("gas");
   });
 
+  it("maps wallet rejection to a wallet cancellation message", () => {
+    const message = parsePokerError("User has rejected the request");
+    expect(message.toLowerCase()).toContain("cancelled");
+  });
+
   it("returns fallback message for noisy errors", () => {
     const message = parsePokerError({ any: "value" });
     expect(typeof message).toBe("string");

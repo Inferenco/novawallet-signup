@@ -138,7 +138,9 @@ export function MultiplierStoreModal({
           <div className="games-casino-stat-card">
             <p className="games-casino-stat-label">Chips</p>
             <p className="games-status-text games-casino-chip-inline">
-              <img src={CHIP_IMAGE_URL} alt="" aria-hidden="true" />
+              <span className="games-chip-medallion games-chip-medallion-sm" aria-hidden="true">
+                <img src={CHIP_IMAGE_URL} alt="" />
+              </span>
               {formatChips(chipBalance)}
             </p>
           </div>
